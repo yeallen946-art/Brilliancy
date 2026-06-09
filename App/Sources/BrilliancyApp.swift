@@ -1,13 +1,12 @@
 import SwiftUI
 
-/// App entry point. M0 boots straight into a board sandbox so we can verify
-/// "load any FEN + make legal moves" in the simulator. Real navigation
-/// (DailyChallenge / Training / GuessSession) arrives in M1+.
+/// App entry point. M1 boots into HomeView, which launches the sample game's
+/// GuessSession. The M0 board sandbox is still reachable from Home for debugging.
 @main
 struct BrilliancyApp: App {
     var body: some Scene {
         WindowGroup {
-            BoardSandboxView()
+            HomeView()
         }
     }
 }

@@ -12,6 +12,16 @@ import SwiftUI
 struct BoardView: View {
     @Binding var game: ChessGame
 
+    /// When false, the board is display-only (no selection / moves). Default interactive.
+    var isInteractive: Bool = true
+    /// If set, a legal move is reported here INSTEAD of being applied to `game` — the owner
+    /// decides what to do (e.g. score a guess). When nil, the move is applied to `game`.
+    var onMove: ((_ from: Sq, _ to: Sq) -> Void)? = nil
+    /// Squares to emphasize (e.g. the user's move vs the master's move on reveal).
+    var emphasis: Set<Sq> = []
+    /// Which color sits at the bottom of the board. Default white (M0 sandbox).
+    var orientation: PieceColor = .white
+
     /// Currently selected source square (for tap-tap moves).
     @State private var selected: Sq?
     /// Legal destinations for the selected square, highlighted.
@@ -47,6 +57,7 @@ struct BoardView: View {
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onEnded { value in
+                        guard isInteractive else { return }
                         guard let from = square(at: value.startLocation, cell: cellSize) else { return }
                         let to = square(at: value.location, cell: cellSize)
                         if let to, to != from {
@@ -81,16 +92,28 @@ struct BoardView: View {
                     .font(.system(size: size * 0.82))
                     .minimumScaleFactor(0.5)
             }
+            if emphasis.contains(sq) {
+                Rectangle()
+                    .strokeBorder(Color.orange, lineWidth: max(2, size * 0.07))
+            }
         }
         .frame(width: size, height: size)
     }
 
-    /// Center point of a square in board-local coordinates (white at bottom, top-left origin).
+    /// Center point of a square in board-local coordinates (top-left origin), honoring orientation.
     private func center(of sq: Sq, cell: CGFloat) -> CGPoint {
-        let col = sq.file
-        let row = 7 - sq.rank // rank 7 (8th rank) is the top screen row
+        let (col, row) = screenColRow(file: sq.file, rank: sq.rank)
         return CGPoint(x: (CGFloat(col) + 0.5) * cell,
                        y: (CGFloat(row) + 0.5) * cell)
+    }
+
+    /// Map (file, rank) -> on-screen (col, row), top-left origin. White-bottom by default;
+    /// Black-bottom mirrors both axes (8th rank toward black, a-file on black's right).
+    private func screenColRow(file: Int, rank: Int) -> (col: Int, row: Int) {
+        switch orientation {
+        case .white: return (file, 7 - rank)
+        case .black: return (7 - file, rank)
+        }
     }
 
     // MARK: - Interaction
@@ -120,9 +143,19 @@ struct BoardView: View {
     }
 
     private func attemptMove(from: Sq, to: Sq) {
-        // Default promotion to queen for M0; full promotion UI is M1.
-        let promotion: PieceKind? = isPromotion(from: from, to: to) ? .queen : nil
-        _ = game.move(from: from, to: to, promotion: promotion)
+        // Only accept legal moves (the highlight path already guarantees this; the drag
+        // path may not). Then either report the move to the owner or apply it locally.
+        guard game.legalDestinations(from: from).contains(to) else {
+            clearSelection()
+            return
+        }
+        if let onMove {
+            onMove(from, to)
+        } else {
+            // Default promotion to queen; full promotion UI is later.
+            let promotion: PieceKind? = isPromotion(from: from, to: to) ? .queen : nil
+            _ = game.move(from: from, to: to, promotion: promotion)
+        }
         clearSelection()
     }
 
@@ -137,11 +170,14 @@ struct BoardView: View {
         highlights = []
     }
 
-    /// Map a point in the board's coordinate space to a square (white at bottom).
+    /// Map a point in the board's coordinate space to a square, honoring orientation.
     private func square(at point: CGPoint, cell: CGFloat) -> Sq? {
         let col = Int(point.x / cell)
         let row = Int(point.y / cell)
         guard (0..<8).contains(col), (0..<8).contains(row) else { return nil }
-        return Sq(file: col, rank: 7 - row)
+        switch orientation {
+        case .white: return Sq(file: col, rank: 7 - row)
+        case .black: return Sq(file: 7 - col, rank: row)
+        }
     }
 }
