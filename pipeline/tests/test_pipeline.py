@@ -233,3 +233,21 @@ def test_plan_stages_full_chain_with_deps():
     assert full == ["ingest", "curate", "analyze", "annotate", "validate", "build"]
     # annotate needs an engine too (it consumes legal_evals)
     assert "annotate" not in run_pipeline.plan_stages(has_engine=False, has_key=True)
+
+
+# --------------------------------------------------------------- curation selection
+
+def test_parse_selected_strips_comments_and_blanks():
+    text = "# header\nmorphy-1858  # the opera game\n\nfischer-1956\n   \n"
+    assert store.parse_selected(text) == {"morphy-1858", "fischer-1956"}
+
+
+def test_load_selected_missing_file_is_none(tmp_path):
+    assert store.load_selected(os.path.join(tmp_path, "nope.txt")) is None
+
+
+def test_load_selected_reads_ids(tmp_path):
+    path = os.path.join(tmp_path, "selected.txt")
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write("a-1\n# skip\nb-2\n")
+    assert store.load_selected(path) == {"a-1", "b-2"}

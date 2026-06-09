@@ -112,3 +112,26 @@ def load_all_games(work_dir: str = WORK_DIR) -> list[GameRecord]:
 
 def existing_source_hashes(work_dir: str = WORK_DIR) -> set[str]:
     return {g.source_hash for g in load_all_games(work_dir)}
+
+
+# ---------------------------------------------------------------- curation selection
+
+SELECTED_FILE = os.path.join(CURATION_DIR, "selected.txt")
+
+
+def parse_selected(text: str) -> set[str]:
+    """Parse a selection list: one game id per line, '#' starts a comment."""
+    ids: set[str] = set()
+    for line in text.splitlines():
+        line = line.split("#", 1)[0].strip()
+        if line:
+            ids.add(line)
+    return ids
+
+
+def load_selected(path: str = SELECTED_FILE) -> set[str] | None:
+    """The human's curated game ids (TECH_SPEC §5 stage 2). None = no selection (use all)."""
+    if not os.path.exists(path):
+        return None
+    with open(path, encoding="utf-8") as fh:
+        return parse_selected(fh.read())

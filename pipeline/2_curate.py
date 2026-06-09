@@ -18,6 +18,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Rank ingested games for curation.")
     parser.add_argument("--work-dir", default=store.WORK_DIR)
     parser.add_argument("--out", default=os.path.join(store.CURATION_DIR, "candidates.csv"))
+    parser.add_argument(
+        "--select-top", type=int, metavar="N",
+        help="write a starter selected.txt with the top N game ids (you then edit it).",
+    )
     args = parser.parse_args()
 
     games = store.load_all_games(args.work_dir)
@@ -36,6 +40,15 @@ def main() -> int:
     print(f"Ranked {len(scores)} game(s) -> {args.out}")
     for c in scores[:10]:
         print(f"  {c.score:5.2f}  {c.game_id}")
+
+    if args.select_top:
+        top = scores[: args.select_top]
+        with open(store.SELECTED_FILE, "w", encoding="utf-8", newline="\n") as fh:
+            fh.write("# Curated game ids (edit freely; '#' starts a comment).\n")
+            fh.write("# Used by 7_build / run_pipeline to gate which games ship.\n")
+            for c in top:
+                fh.write(f"{c.game_id}\n")
+        print(f"Wrote starter selection ({len(top)} ids) -> {store.SELECTED_FILE}")
     return 0
 
 

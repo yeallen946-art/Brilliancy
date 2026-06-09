@@ -25,11 +25,18 @@ def main() -> int:
     args = parser.parse_args()
 
     games = store.load_all_games(args.work_dir)
+
+    # Honor the human's curation pick (content/curation/selected.txt) if present.
+    selected = store.load_selected()
+    if selected is not None:
+        games = [g for g in games if g.id in selected]
+        print(f"Selection list active: {len(games)} of {len(selected)} selected id(s) present.")
+
     if not args.all:
         games = [g for g in games if g.review_status == store.REVIEW_APPROVED]
 
     if not games:
-        print("No games to build (need approved games, or pass --all).")
+        print("No games to build (need approved + selected games, or pass --all).")
         return 1
 
     # Safety gate: validation must pass before shipping content (hard rule).

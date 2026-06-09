@@ -63,7 +63,13 @@ def main() -> int:
     _run(["2_curate.py"])
 
     if "analyze" in stages or "annotate" in stages:
-        for game in store.load_all_games():
+        # Only spend engine/API budget on the human-selected games, if a selection exists.
+        selected = store.load_selected()
+        games = store.load_all_games()
+        if selected is not None:
+            games = [g for g in games if g.id in selected]
+            print(f"\nSelection active: analyzing/annotating {len(games)} selected game(s).")
+        for game in games:
             if "analyze" in stages:
                 _run(["3_analyze.py", "--game-id", game.id, "--engine", args.engine])
             if "annotate" in stages:

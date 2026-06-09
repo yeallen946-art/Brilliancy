@@ -15,6 +15,7 @@ FAMOUS_PLAYERS = {
     "fischer", "kasparov", "karpov", "tal", "capablanca", "alekhine", "botvinnik",
     "morphy", "lasker", "carlsen", "anand", "kramnik", "spassky", "petrosian",
     "nimzowitsch", "rubinstein", "smyslov", "korchnoi", "bronstein", "keres",
+    "anderssen", "steinitz", "pillsbury", "marshall", "reti", "euwe", "fine",
 }
 
 

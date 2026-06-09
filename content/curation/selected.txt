@@ -1,0 +1,4 @@
+# Curated game ids (edit freely; '#' starts a comment).
+# Used by 7_build / run_pipeline to gate which games ship.
+morphy-isouard-1858-f7f676
+byrne-fischer-1956-8c3723
