@@ -1,0 +1,13 @@
+# Normalize line endings across Windows and macOS — store as LF in the repo.
+* text=auto eol=lf
+
+# Treat Xcode project files carefully; they conflict easily.
+*.pbxproj merge=union
+*.pbxproj text eol=lf
+
+# Binary content (do not normalize)
+*.sqlite binary
+*.png binary
+*.jpg binary
+*.pdf binary
+*.mp4 binary

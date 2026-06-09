@@ -1,0 +1,80 @@
+# Brilliancy — XcodeGen project definition (TECH_SPEC §2.1).
+# The .xcodeproj is generated from THIS file and is git-ignored — never commit it,
+# never hand-edit the generated project. To add a source file, just drop the .swift
+# into the right folder under Sources/ and it gets globbed in automatically.
+#
+# macOS side, after pulling: `cd App && xcodegen generate` then build/test.
+
+name: Brilliancy
+
+options:
+  bundleIdPrefix: com.brilliancy
+  createIntermediateGroups: true
+  deploymentTarget:
+    iOS: "17.0"
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    # DEVELOPMENT_TEAM is intentionally empty — set it on the Mac (signing is a
+    # local/GUI concern; never commit a team id). Simulator builds don't need it.
+
+packages:
+  # Chess rules: legal move gen, FEN/PGN, SAN (TECH_SPEC §2). Evaluate-first choice.
+  ChessKit:
+    url: https://github.com/chesskit-app/chesskit-swift
+    from: "0.14.0"
+  # SQLite persistence: bundled read-only content DB + local user DB (TECH_SPEC §4).
+  GRDB:
+    url: https://github.com/groue/GRDB.swift
+    from: "6.24.0"
+  # NOTE: TelemetryDeck (analytics) is on the allowlist but deferred to M3+; not wired
+  # yet to keep the M0 build minimal. Add here when analytics events land (TECH_SPEC §8).
+
+targets:
+  Brilliancy:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: Sources
+    dependencies:
+      - package: ChessKit
+      - package: GRDB
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.brilliancy.app
+        GENERATE_INFOPLIST_FILE: YES
+        # SwiftUI app lifecycle — let Xcode synthesize the scene manifest & launch screen
+        # so we don't hand-maintain an Info.plist (keeps the cross-machine setup simple).
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait"
+        TARGETED_DEVICE_FAMILY: "1" # iPhone only in V1 (iPad runs scaled, TECH_SPEC §10)
+
+  BrilliancyTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: Tests
+    dependencies:
+      - target: Brilliancy
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  Brilliancy:
+    build:
+      targets:
+        Brilliancy: all
+        BrilliancyTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - BrilliancyTests
