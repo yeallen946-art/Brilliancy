@@ -71,6 +71,15 @@ def build_sqlite(games: list[GameRecord], db_path: str, packs: list[dict] | None
         conn.close()
 
 
+def daily_date_or_none(pgn_date: str | None) -> str | None:
+    """Convert a PGN date ('1956.10.17') to 'YYYY-MM-DD', or None for partial dates
+    ('1910.??.??') — many classic PGNs lack a real month/day."""
+    parts = (pgn_date or "").split(".")
+    if len(parts) == 3 and len(parts[0]) == 4 and all(p.isdigit() for p in parts):
+        return "-".join(parts)
+    return None
+
+
 def daily_payload(game: GameRecord, date: str) -> dict:
     """One full game in the daily-challenge JSON shape (TECH_SPEC §4)."""
     return {

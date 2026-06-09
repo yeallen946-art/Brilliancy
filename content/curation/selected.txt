@@ -2,3 +2,6 @@
 # Used by 7_build / run_pipeline to gate which games ship.
 morphy-isouard-1858-f7f676
 byrne-fischer-1956-8c3723
+anderssen-dufresne-1852-19c037
+anderssen-kieseritzky-1851-f5495f
+reti-tartakower-1910-2d0490

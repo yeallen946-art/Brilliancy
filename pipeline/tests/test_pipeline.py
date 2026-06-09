@@ -173,6 +173,13 @@ def test_daily_payload_shape():
     assert payload["game"]["hero_color"] == "white"
 
 
+def test_daily_date_rejects_partial_pgn_dates():
+    assert build.daily_date_or_none("1956.10.17") == "1956-10-17"
+    assert build.daily_date_or_none("1910.??.??") is None   # classic PGN, no month/day
+    assert build.daily_date_or_none("") is None
+    assert build.daily_date_or_none(None) is None
+
+
 # ------------------------------------------------------------- store roundtrip
 
 def test_store_roundtrip(tmp_path):

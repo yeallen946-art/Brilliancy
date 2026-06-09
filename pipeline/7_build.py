@@ -12,7 +12,7 @@ import argparse
 import os
 
 import store
-from build import build_sqlite, write_daily
+from build import build_sqlite, daily_date_or_none, write_daily
 from validate import validate_game
 
 
@@ -48,11 +48,12 @@ def main() -> int:
     build_sqlite(games, args.db)
     print(f"Built {args.db} from {len(games)} game(s).")
 
-    # Daily archive: emit each game keyed by its date if present (skip if no date).
+    # Daily archive: emit each game keyed by a full numeric date (skip partial dates
+    # like "1910.??.??" — many classic PGNs lack a month/day).
     written = 0
     for g in games:
-        date = (g.date or "").replace(".", "-")
-        if len(date) == 10 and date[4] == "-" and date[7] == "-":
+        date = daily_date_or_none(g.date)
+        if date:
             write_daily(g, date, args.daily_dir)
             written += 1
     print(f"Wrote {written} daily JSON file(s) to {args.daily_dir}.")
