@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+VERSION="2.45.4"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+CACHE_DIR="$ROOT_DIR/.xcodegen/$VERSION"
+BIN="$CACHE_DIR/xcodegen/bin/xcodegen"
+
+if command -v xcodegen >/dev/null 2>&1; then
+  exec xcodegen "$@"
+fi
+
+if [[ ! -x "$BIN" ]]; then
+  mkdir -p "$CACHE_DIR"
+  TMP_ZIP="$(mktemp -t xcodegen.XXXXXX.zip)"
+  trap 'rm -f "$TMP_ZIP"' EXIT
+
+  curl -fsSL \
+    "https://github.com/yonaskolb/XcodeGen/releases/download/$VERSION/xcodegen.zip" \
+    -o "$TMP_ZIP"
+  unzip -q -o "$TMP_ZIP" -d "$CACHE_DIR"
+fi
+
+exec "$BIN" "$@"

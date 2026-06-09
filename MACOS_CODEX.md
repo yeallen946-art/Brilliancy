@@ -39,10 +39,12 @@ From the repo root:
 git status --short --branch
 git pull --ff-only
 cd App
-xcodegen generate
+../scripts/xcodegen generate
 xcodebuild -scheme Brilliancy -destination 'platform=iOS Simulator,name=iPhone 16' build
 xcodebuild -scheme Brilliancy -destination 'platform=iOS Simulator,name=iPhone 16' test
 ```
+
+Use `../scripts/xcodegen` instead of calling `xcodegen` directly. The wrapper uses a system-installed XcodeGen when available; otherwise it downloads the pinned project version into `.xcodegen/`, which is git-ignored.
 
 If `iPhone 16` is not installed on the Mac, use an available iPhone simulator and report the exact destination used.
 
