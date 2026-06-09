@@ -4,6 +4,11 @@ import SwiftUI
 /// tap-tap (tap source, tap destination) or by dragging. Engine-agnostic — it only
 /// knows about `ChessGame`/`Sq`/`PlacedPiece`. White is at the bottom for M0;
 /// orientation flipping (play the hero's color) comes with GuessSession in M1.
+///
+/// Layout: the board fits a 1:1 square into whatever space it's given and centers
+/// itself. Each of the 64 squares is laid out by its CENTER via `.position(...)`
+/// inside a fixed `side × side` container — never with `.offset`, which is a
+/// post-layout visual transform and would let the grid spill outside its bounds.
 struct BoardView: View {
     @Binding var game: ChessGame
 
@@ -15,23 +20,35 @@ struct BoardView: View {
     private let lightColor = Color(red: 0.93, green: 0.85, blue: 0.71)
     private let darkColor  = Color(red: 0.55, green: 0.40, blue: 0.27)
 
+    /// All 64 squares (file 0…7, rank 0…7).
+    private static let allSquares: [Sq] = (0..<8).flatMap { rank in
+        (0..<8).map { file in Sq(file: file, rank: rank) }
+    }
+
     var body: some View {
         GeometryReader { geo in
             let side = min(geo.size.width, geo.size.height)
-            let cell = side / 8
+            let cellSize = side / 8
+            let pieceBySquare = Dictionary(
+                game.pieces.map { ($0.square, $0) },
+                uniquingKeysWith: { first, _ in first }
+            )
 
             ZStack(alignment: .topLeading) {
-                squares(cell: cell)
-                pieces(cell: cell)
+                ForEach(Self.allSquares, id: \.self) { sq in
+                    cell(sq, piece: pieceBySquare[sq], size: cellSize)
+                        .position(center(of: sq, cell: cellSize))
+                }
             }
             .frame(width: side, height: side)
+            .contentShape(Rectangle())
             // One board-level gesture handles BOTH tap-tap and drag: if the press
             // starts and ends on the same square it's a tap; otherwise it's a drag.
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onEnded { value in
-                        guard let from = square(at: value.startLocation, cell: cell) else { return }
-                        let to = square(at: value.location, cell: cell)
+                        guard let from = square(at: value.startLocation, cell: cellSize) else { return }
+                        let to = square(at: value.location, cell: cellSize)
                         if let to, to != from {
                             attemptMove(from: from, to: to)
                         } else {
@@ -39,57 +56,41 @@ struct BoardView: View {
                         }
                     }
             )
+            // Center the square board within the (possibly non-square) proposed area.
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         }
         .aspectRatio(1, contentMode: .fit)
     }
 
     // MARK: - Rendering
 
-    private func squares(cell: CGFloat) -> some View {
-        ForEach(0..<8, id: \.self) { row in
-            ForEach(0..<8, id: \.self) { col in
-                // row 0 is the TOP of the screen = rank 8 (index 7) with white at bottom.
-                let sq = Sq(file: col, rank: 7 - row)
-                Rectangle()
-                    .fill(sq.isLight ? lightColor : darkColor)
-                    .overlay(highlightOverlay(for: sq, cell: cell))
-                    .overlay(selectionOverlay(for: sq))
-                    .frame(width: cell, height: cell)
-                    .offset(x: CGFloat(col) * cell, y: CGFloat(row) * cell)
+    private func cell(_ sq: Sq, piece: PlacedPiece?, size: CGFloat) -> some View {
+        ZStack {
+            Rectangle().fill(sq.isLight ? lightColor : darkColor)
+
+            if selected == sq {
+                Rectangle().fill(Color.yellow.opacity(0.4))
+            }
+            if highlights.contains(sq) {
+                Circle()
+                    .fill(Color.green.opacity(0.45))
+                    .frame(width: size * 0.32, height: size * 0.32)
+            }
+            if let piece {
+                Text(piece.glyph)
+                    .font(.system(size: size * 0.82))
+                    .minimumScaleFactor(0.5)
             }
         }
+        .frame(width: size, height: size)
     }
 
-    @ViewBuilder
-    private func highlightOverlay(for sq: Sq, cell: CGFloat) -> some View {
-        if highlights.contains(sq) {
-            Circle()
-                .fill(Color.green.opacity(0.45))
-                .frame(width: cell * 0.32, height: cell * 0.32)
-        }
-    }
-
-    @ViewBuilder
-    private func selectionOverlay(for sq: Sq) -> some View {
-        if selected == sq {
-            Rectangle().fill(Color.yellow.opacity(0.4))
-        }
-    }
-
-    private func pieces(cell: CGFloat) -> some View {
-        ForEach(game.pieces, id: \.self) { piece in
-            Text(piece.glyph)
-                .font(.system(size: cell * 0.82))
-                .frame(width: cell, height: cell)
-                .offset(offset(for: piece.square, cell: cell))
-                .allowsHitTesting(false) // gestures are handled at the board level
-        }
-    }
-
-    private func offset(for sq: Sq, cell: CGFloat) -> CGSize {
+    /// Center point of a square in board-local coordinates (white at bottom, top-left origin).
+    private func center(of sq: Sq, cell: CGFloat) -> CGPoint {
         let col = sq.file
-        let row = 7 - sq.rank // flip rank back to top-origin screen row
-        return CGSize(width: CGFloat(col) * cell, height: CGFloat(row) * cell)
+        let row = 7 - sq.rank // rank 7 (8th rank) is the top screen row
+        return CGPoint(x: (CGFloat(col) + 0.5) * cell,
+                       y: (CGFloat(row) + 0.5) * cell)
     }
 
     // MARK: - Interaction
