@@ -6,7 +6,7 @@ Stage 5 (`5_validate.py`) gets its own known-bad-annotation suite in M2 (TECH_SP
 import chess
 import chess.engine
 
-from analysis import MoveEval, normalize_cp_to_mover, pick_top_n
+from analysis import MoveEval, normalize_cp_to_mover, sort_best_first
 
 
 def test_normalize_cp_white_to_move():
@@ -29,7 +29,7 @@ def test_normalize_mate_for_mover():
     assert ev.mate == 3 and ev.cp is None
 
 
-def test_pick_top_n_orders_best_first_and_truncates():
+def test_sort_best_first_orders_and_truncates():
     evals = [
         MoveEval("a", cp=-20, mate=None),
         MoveEval("b", cp=120, mate=None),
@@ -37,14 +37,25 @@ def test_pick_top_n_orders_best_first_and_truncates():
         MoveEval("d", cp=None, mate=-1),    # getting mated — worst
         MoveEval("e", cp=35, mate=None),
     ]
-    top = pick_top_n(evals, n=3)
+    top = sort_best_first(evals, n=3)
     assert [m.uci for m in top] == ["c", "b", "e"]
 
 
-def test_pick_top_n_faster_mate_wins():
+def test_sort_best_first_returns_all_when_n_none():
+    # n=None is the canonical "all legal moves" mode (TECH_SPEC §5).
+    evals = [
+        MoveEval("a", cp=-20, mate=None),
+        MoveEval("b", cp=120, mate=None),
+        MoveEval("d", cp=None, mate=-1),
+    ]
+    ordered = sort_best_first(evals)
+    assert [m.uci for m in ordered] == ["b", "a", "d"]
+
+
+def test_sort_best_first_faster_mate_wins():
     evals = [
         MoveEval("slow", cp=None, mate=5),
         MoveEval("fast", cp=None, mate=1),
     ]
-    top = pick_top_n(evals, n=2)
+    top = sort_best_first(evals)
     assert [m.uci for m in top] == ["fast", "slow"]

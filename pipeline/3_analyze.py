@@ -16,7 +16,7 @@ import sys
 
 import chess
 
-from analysis import DEFAULT_DEPTH, DEFAULT_MULTIPV, analyze_position
+from analysis import DEFAULT_DEPTH, analyze_position
 
 
 def _format(move_evals, fen: str) -> str:
@@ -38,7 +38,12 @@ def main() -> int:
     group.add_argument("--fen", help="Analyze a single FEN position (M0).")
     group.add_argument("--game-id", help="Analyze a full game from the work DB (M2).")
     parser.add_argument("--depth", type=int, default=DEFAULT_DEPTH)
-    parser.add_argument("--multipv", type=int, default=DEFAULT_MULTIPV)
+    parser.add_argument(
+        "--multipv",
+        type=int,
+        default=None,
+        help="Cap candidate moves (default: all legal moves, per TECH_SPEC §5).",
+    )
     parser.add_argument("--engine", default="stockfish", help="Path to the Stockfish binary.")
     args = parser.parse_args()
 
