@@ -80,14 +80,17 @@ App/
 State machine per game:
 
 ```
-LOAD → SHOW_CONTEXT → [for each guess point:]
-  PRESENT_POSITION → AWAIT_GUESS → SCORE → REVEAL(master move + annotation)
-  → AUTOPLAY(opponent reply + skipped moves) → next point
+LOAD → SHOW_CONTEXT → WALK_IN(animate plies 1..N to first guess point)
+  → [for each guess point:]
+    AWAIT_GUESS → SCORE → REVEAL(master move + annotation)
+    → WALK_TO_NEXT(animate moves up to and including the next guess point)
 → GAME_SUMMARY(total score, rating delta, share/upsell)
 ```
 
 - Guess points are precomputed by the pipeline (`is_guess_point` flag per ply).
-- Opening moves and forced sequences autoplay at ~0.5s/move with board animation.
+- **Never jump-cut to a position.** Reaching any guess point — the first one and every transition — is always done by **animating through the intervening moves one ply at a time** so the player keeps the thread of the game. The board never teleports.
+- Animation speed is **fast but legible**: ~250–400ms/ply for the walk-in/transition moves (default; in `BoardConfig`), each with the standard move-slide animation. The opponent's reply right after a guess is shown at the same legible pace, not instantly.
+- Long opening run-ups can move quicker (e.g. ~200ms/ply for book moves) but still play move-by-move, not skipped. The point is continuity, not speed.
 - User plays the master's color for the entire game.
 
 ### 3.2 Scoring
@@ -230,11 +233,4 @@ Render offscreen SwiftUI view → UIImage: app name, date, score band (emoji row
 
 - **Unit (required):** Scoring + rating math (pure functions — table-driven tests), SAN/FEN round-trips, guess-point gating of pipeline output, entitlement gating logic.
 - **Pipeline (required):** `5_validate.py` has its own test suite with known-bad annotations.
-- **Snapshot:** BoardView rendering, share card.
-- **Manual/TestFlight:** IAP flows (sandbox), full game UX with seed users.
-
-## 10. Out of Scope (V1)
-
-Backend/auth, Android, any on-device engine (everything is precomputed — `legal_evals` covers every legal move at each guess point, so there is no "unknown move" case), localization, iPad-optimized layout (runs scaled), Game Center.
-
-**Edge case — illegal/non-legal input:** the BoardView only allows legal moves, so every guess is in `legal_evals`. The only "missing" case is a guess at a non-guess-point (can't happen — UI only prompts at guess points). Never run an engine on device in V1.
+- **Snapshot:** Bo
