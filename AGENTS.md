@@ -13,6 +13,8 @@ This project is developed by more than one agent on more than one machine. Typic
 - **Windows / Claude Code** — writes features and the Python pipeline. Cannot build or run the iOS app (no Xcode on Windows). Writes Swift "blind," relying on the spec and tests.
 - **macOS / Codex (or Claude Code)** — owns the build/test/debug loop: runs `xcodebuild`, reads compiler and test errors, fixes build breakage, runs the app in the simulator.
 
+macOS/Codex sessions should also read `MACOS_CODEX.md` before running the build loop.
+
 Roles are a convention, not a wall — but stay in your lane unless the other side is clearly blocked. The macOS agent's job is to make the code *actually compile and pass tests*; the Windows agent's job is to make it *do the right thing*. Neither invents chess content (that only comes from the pipeline — see CLAUDE.md hard rule #1).
 
 ## New-session startup checklist
@@ -22,9 +24,7 @@ Every new agent session starts from the files, not from chat history:
 1. Read `AGENTS.md` first, then `CLAUDE.md`; `CLAUDE.md` hard rules win if there is any conflict.
 2. For product decisions, read `PRD.md`; for implementation decisions, read `TECH_SPEC.md`; for milestone scope and acceptance, read `ROADMAP.md`.
 3. Run `git status --short --branch`, then `git pull --ff-only` before making changes.
-4. On macOS, regenerate the Xcode project from `App/project.yml` with `cd App && xcodegen generate`; never edit or commit `App/Brilliancy.xcodeproj`.
-5. Use `xcodebuild` for build/test/debug. If the documented simulator (currently `iPhone 16`) is not installed on the Mac, use an available iPhone simulator and report the exact destination used.
-6. Commit only source/config/doc changes that belong to the task. Generated build products, DerivedData, local tool downloads, and `.xcodeproj` stay out of git.
+4. Commit only source/config/doc changes that belong to the task. Generated build products, DerivedData, local tool downloads, and `.xcodeproj` stay out of git.
 
 ## How agents stay in sync (normal git hygiene, nothing exotic)
 
