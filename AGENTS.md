@@ -48,8 +48,9 @@ There is no shared memory between agents. The only shared state is what's commit
 ```bash
 # from App/ — regenerate the project first if files/project.yml changed
 xcodegen generate
-xcodebuild -scheme Brilliancy -destination 'platform=iOS Simulator,name=iPhone 16' build
-xcodebuild -scheme Brilliancy -destination 'platform=iOS Simulator,name=iPhone 16' test
+# Destination device must exist in the local Xcode — list with: xcrun simctl list devices available
+xcodebuild -scheme Brilliancy -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
+xcodebuild -scheme Brilliancy -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test
 ```
 
 The macOS agent communicates with Xcode **only through `xcodebuild`** (a command-line tool) — it does not drive the Xcode GUI. GUI-only things (visual simulator inspection, real-device debugging, App Store Connect submission) require Jerry, not an agent.

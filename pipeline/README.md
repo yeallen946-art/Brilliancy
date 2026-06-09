@@ -7,7 +7,10 @@ Python 3.12 content pipeline (TECH_SPEC §5). Cross-platform; fully developable 
 
 ```bash
 cd pipeline
-python -m venv .venv
+# Use Python 3.12 (TECH_SPEC §2). The bare `python` may default to a newer version;
+# pin it explicitly so the env matches across machines:
+py -3.12 -m venv .venv        # Windows (py launcher)
+# python3.12 -m venv .venv    # macOS/Linux
 # Windows (PowerShell):
 .venv\Scripts\Activate.ps1
 # macOS/Linux:

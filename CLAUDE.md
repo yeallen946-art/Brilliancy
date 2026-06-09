@@ -23,8 +23,9 @@ docs/       # PRD.md, TECH_SPEC.md, ROADMAP.md live at repo root or here
 # iOS (run from App/). The .xcodeproj is generated from project.yml, not committed.
 # On macOS, regenerate after pulling if files or project.yml changed:
 xcodegen generate                        # reads project.yml -> Brilliancy.xcodeproj
-xcodebuild -scheme Brilliancy -destination 'platform=iOS Simulator,name=iPhone 16' build
-xcodebuild -scheme Brilliancy -destination 'platform=iOS Simulator,name=iPhone 16' test
+# Destination device must exist in the local Xcode — list with: xcrun simctl list devices available
+xcodebuild -scheme Brilliancy -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
+xcodebuild -scheme Brilliancy -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test
 # From Windows (no Xcode): edit Swift files + project.yml only; never hand-edit .xcodeproj
 
 # Pipeline (run from pipeline/, venv at pipeline/.venv)
