@@ -92,25 +92,41 @@ LOAD → SHOW_CONTEXT → [for each guess point:]
 
 ### 3.2 Scoring
 
-Per guess point, the content DB stores: master move, engine eval of position, eval of top-5 moves (cp, from White's perspective, normalized to mover's perspective at runtime).
+**Core principle: a guess is scored on the OBJECTIVE quality of the move (engine), not on whether it matches the master.** Matching the master is a recognition layer on top, never the cap. A user who finds an engine-best move the master didn't play must score full marks; a user who finds a celebrated master move the engine slightly dislikes must also score full marks. You only score low when your move is *both* worse than the engine *and* not what the master played.
+
+Per guess point, the content DB stores the eval of **every legal move** (not just top-5) plus a short refutation line per move (see §4). At runtime, for any user move we therefore have its `eval_delta` directly — no on-device engine, no "not in top-5" fallback bucket.
 
 ```
-score(guess):
-  if guess == master_move:            100  # "Match"
-  elif eval_delta(guess) <= 30cp
-       and guess in engine_top5:       85  # "Equally strong"
-  elif eval_delta(guess) <= 80cp:      55  # "Reasonable"
-  elif eval_delta(guess) <= 150cp:     25  # "Inaccuracy"
-  else:                                 0  # "Blunder" (flag red)
-eval_delta = eval(best_move) - eval(guess), clamped at mate scores
+eval_delta(move) = eval(engine_best) - eval(move)   # cp, normalized to mover's POV, clamped at mate scores
+
+qualityScore(move):                    # objective, engine-based
+  d = eval_delta(move)
+  if d <= 10cp:   100                   # engine-best or tied
+  elif d <= 40cp:  90                   # excellent
+  elif d <= 80cp:  70                   # good
+  elif d <= 150cp: 45                   # inaccuracy
+  elif d <= 300cp: 20                   # mistake
+  else:             0                   # blunder (flag red)
+
+score(guess) = max( qualityScore(guess),
+                    100 if guess == master_move else 0 )   # master-match floor
 ```
 
-Game score = mean of point scores. Tune constants during TestFlight; keep them in one config struct.
+The `max` is the whole fix:
+- **Better than master** → full marks via `qualityScore`; UI flag `BEAT_MASTER` ("Engine prefers your move over <master>'s").
+- **Matched a sub-optimal/celebrated master move** (e.g. a speculative brilliancy the engine quibbles with) → full marks via the master-match floor; UI flag `MATCH`; annotation notes the engine's view honestly.
+- **Engine-best move that also is the master move** → full marks; flag `MATCH` + `ENGINE_TOP`.
+- **Objectively bad and not the master move** → low score, no rescue.
+
+UI feedback bands map from the *reason* for the score, not just the number: `MATCH` / `BEAT_MASTER` / `ENGINE_TOP` (green), good-but-not-best (yellow), mistake/blunder (red). The three-tier color in PRD §5 / UI_FLOW S2 is driven by these flags.
+
+Game score = mean of point scores. All constants live in one `ScoringConfig` struct; tune during TestFlight.
 
 ### 3.3 Guess Rating (Elo-like)
 
 - User rating `R` starts at 1200. Each guess point has a difficulty `D` (precomputed: based on % of engine-top-move obviousness — eval gap between best and second-best move, plus move type).
-- Update: `R' = R + K * (s - E)` where `s` = normalized point score (0..1), `E = 1 / (1 + 10^((D - R)/400))`, `K = 16` (24 for first 100 guesses — fast early movement, per PRD §4.3 the curve should feel generous early).
+- Update: `R' = R + K * (s - E)` where `s` = normalized **`qualityScore`** (0..1) — NOT the master-floored display score, `E = 1 / (1 + 10^((D - R)/400))`, `K = 16` (24 for first 100 guesses — fast early movement, per PRD §4.3 the curve should feel generous early).
+- Rationale: the display score gives a courtesy 100 for copying a weak master move, but the *rating* must reflect real skill, so it tracks objective move quality only. (The two diverge only in the rare master-suboptimal case.)
 - Store every rating snapshot for the history chart.
 - Weakness breakdown: each guess point is tagged (`tactical | positional | endgame | opening | defense`) by the pipeline; aggregate hit-rate per tag.
 
@@ -125,10 +141,16 @@ games(id, white, black, event, year, result, eco, hero_color,
       pack_id, ply_count)
 moves(game_id, ply, san, uci, fen_before,
       is_guess_point, difficulty, tags,        -- tags: JSON array
-      eval_cp, eval_mate,                      -- position eval before move
-      top5,                                    -- JSON: [{uci, cp, mate}]
-      annotation,                              -- why the master move works
-      wrong_move_notes)                        -- JSON: {uci: "why this fails"} for 2-3 common wrong guesses
+      eval_cp, eval_mate,                      -- position eval before move (engine-best)
+      legal_evals,                             -- JSON: {uci: {cp|mate, refutation_pv:[uci,uci,uci], motif}}
+                                               --   for EVERY legal move at this guess point (multipv=all).
+                                               --   refutation_pv = engine's short reply line; motif = tag like
+                                               --   "hangs_piece" | "drops_exchange" | "allows_fork" | "ok" | "best"
+      annotation,                              -- LLM prose: why the master move works (always present)
+      alt_annotations)                         -- JSON: {uci: prose} for the "interesting" moves only —
+                                               --   engine top-N + statistically-common wrong guesses.
+                                               --   Long-tail moves get NO prose; the app templates an
+                                               --   explanation at runtime from legal_evals (see §3.2 / §5).
 packs(id, name, kind,          -- player | theme | daily_archive
       description, price_tier, -- free | premium
       sort_order)
@@ -158,14 +180,23 @@ pipeline/
   2_curate.py     # candidate scoring: famous players, decisive results,
                   #   sacrifice/tactic density; output curation list for
                   #   human pick (Jerry/son selects the 50 MVP games)
-  3_analyze.py    # Stockfish: eval + top5 per position (depth ~22 or
-                  #   200ms/pos); mark guess points: skip book moves
-                  #   (first ~8 plies unless novelty), skip forced
-                  #   recaptures, target 15-30 points/game; difficulty
-                  #   + tag assignment
-  4_annotate.py   # Claude API: generate narrative_intro, annotation,
-                  #   wrong_move_notes. Prompt receives engine lines and
-                  #   MUST ground every claim in them. Batch API for cost.
+  3_analyze.py    # Stockfish per guess-point position:
+                  #   - multipv = ALL legal moves: eval + short refutation
+                  #     PV + motif tag for each (fills moves.legal_evals)
+                  #   - mark guess points: skip book moves (first ~8 plies
+                  #     unless novelty), skip forced recaptures, target
+                  #     15-30 points/game; difficulty + tag assignment
+                  #   depth ~22 or time-budget/pos; multipv=all is cheap
+                  #   at moderate depth and is a one-time offline cost
+  4_annotate.py   # Claude API: generate narrative_intro, annotation (master
+                  #   move), and alt_annotations for INTERESTING moves only
+                  #   (engine top-N + common wrong guesses). Long-tail moves
+                  #   get no prose — the app templates them from legal_evals.
+                  #   Prompt receives engine lines and MUST ground every claim
+                  #   in them. Batch API for cost. Honesty rule: when the
+                  #   master move is not engine-best (e.g. a brilliancy), the
+                  #   annotation states the engine's view, not a fake claim
+                  #   that the master move is objectively best.
   5_validate.py   # automated checks: every move mentioned in annotation
                   #   is legal and appears in engine top5/PV; eval
                   #   adjectives match numbers ("winning" needs >+2.0);
@@ -175,9 +206,9 @@ pipeline/
   7_build.py      # approved games → content.sqlite + daily JSON files
 ```
 
-**Annotation grounding contract (critical, see PRD §6):** the LLM prompt includes engine PV and top-5 for the position; the system prompt forbids chess claims not derivable from the provided lines; `5_validate.py` rejects annotations referencing moves outside engine output. Rejected items go back to step 4 with the validation error in the retry prompt.
+**Annotation grounding contract (critical, see PRD §6):** the LLM prompt includes engine PV and the relevant lines from `legal_evals` for the position; the system prompt forbids chess claims not derivable from the provided lines; `5_validate.py` rejects annotations referencing moves outside engine output, AND rejects any claim that a move is "best"/"winning" that contradicts `legal_evals` (this is what enforces the §3.2 honesty rule about master-suboptimal brilliancies). Rejected items go back to step 4 with the validation error in the retry prompt.
 
-Cost note: ~50 games × ~25 points × (1 annotation + 2-3 wrong-move notes) ≈ manageable in Claude Max / Batch API budget; regenerate only failed items.
+Cost note: prose is generated only for the master move + interesting alternatives (engine top-N + common wrong guesses), NOT for every legal move — long-tail moves are templated at runtime. So ~50 games × ~25 points × (1 + a few) prose snippets ≈ manageable in Claude Max / Batch API budget; regenerate only failed items. `legal_evals` (all moves) is engine-only, no LLM cost.
 
 ## 6. Monetization Implementation
 
@@ -204,6 +235,6 @@ Render offscreen SwiftUI view → UIImage: app name, date, score band (emoji row
 
 ## 10. Out of Scope (V1)
 
-Backend/auth, Android, real-time engine analysis on device of arbitrary user moves beyond stored top-5 (everything precomputed; if guess not in top-5, score from stored eval via "not in top 5" bucket — see Scoring), localization, iPad-optimized layout (runs scaled), Game Center.
+Backend/auth, Android, any on-device engine (everything is precomputed — `legal_evals` covers every legal move at each guess point, so there is no "unknown move" case), localization, iPad-optimized layout (runs scaled), Game Center.
 
-**Edge case to handle explicitly:** user guess not in stored top-5 → treat as `eval_delta > 80cp` minimum; never run engine on device in V1.
+**Edge case — illegal/non-legal input:** the BoardView only allows legal moves, so every guess is in `legal_evals`. The only "missing" case is a guess at a non-guess-point (can't happen — UI only prompts at guess points). Never run an engine on device in V1.
