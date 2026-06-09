@@ -53,7 +53,11 @@ struct ChessGame {
 
     /// Legal destination squares for whatever piece sits on `from` (empty if none / not mover's).
     func legalDestinations(from square: Sq) -> [Sq] {
-        board.legalMoves(forPieceAt: Self.square(from: square))
+        let source = Self.square(from: square)
+        guard let piece = board.position.piece(at: source),
+              piece.color == board.position.sideToMove else { return [] }
+
+        return board.legalMoves(forPieceAt: source)
             .compactMap(Self.sq(from:))
     }
 
@@ -62,7 +66,11 @@ struct ChessGame {
     /// default promotion behavior is accepted for now. See PRD/TECH_SPEC for full rules.
     @discardableResult
     mutating func move(from: Sq, to: Sq, promotion: PieceKind? = nil) -> Bool {
-        board.move(pieceAt: Self.square(from: from), to: Self.square(from: to)) != nil
+        let source = Self.square(from: from)
+        guard let piece = board.position.piece(at: source),
+              piece.color == board.position.sideToMove else { return false }
+
+        return board.move(pieceAt: source, to: Self.square(from: to)) != nil
     }
 
     // MARK: - Sq <-> ChessKit.Square bridge (algebraic-name based; see MACOS-FIXME #6)
