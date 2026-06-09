@@ -106,3 +106,65 @@ def analyze_position(
         results.append(MoveEval(uci=pv[0].uci(), cp=ev.cp, mate=ev.mate))
 
     return sort_best_first(results, n=multipv)
+
+
+def motif(cp: int | None, mate: int | None, best_cp: int | None) -> str:
+    """Graded quality tag for a candidate move (fills legal_evals.motif, TECH_SPEC §4).
+
+    M2 first pass: graded by eval_delta from the best move. The semantic motifs from the
+    spec ("hangs_piece" | "allows_fork" | ...) need richer board analysis and are a later
+    refinement; this gives a useful, engine-derived tag now.
+    """
+    if mate is not None:
+        return "best" if mate > 0 else "blunder"
+    if cp is None or best_cp is None:
+        return "ok"
+    delta = best_cp - cp
+    if delta <= 10:
+        return "best"
+    if delta <= 80:
+        return "ok"
+    if delta <= 150:
+        return "inaccuracy"
+    if delta <= 300:
+        return "mistake"
+    return "blunder"
+
+
+def analyze_legal_evals(
+    fen: str,
+    *,
+    depth: int = DEFAULT_DEPTH,
+    refutation_len: int = 3,
+    engine_path: str = "stockfish",
+) -> dict:
+    """Evaluate EVERY legal move and return the `legal_evals` dict (TECH_SPEC §4):
+    uci -> {cp, mate, refutation_pv, motif}. Requires Stockfish on PATH.
+    """
+    board = chess.Board(fen)
+    legal_count = board.legal_moves.count()
+    if legal_count == 0:
+        return {}
+
+    with chess.engine.SimpleEngine.popen_uci(engine_path) as engine:
+        infos = engine.analyse(board, chess.engine.Limit(depth=depth), multipv=legal_count)
+
+    raw: list[tuple[str, int | None, int | None, list[str]]] = []
+    for info in infos:
+        pv = info.get("pv")
+        if not pv:
+            continue
+        ev = normalize_cp_to_mover(info["score"], board.turn)
+        refutation = [m.uci() for m in pv[1 : 1 + refutation_len]]
+        raw.append((pv[0].uci(), ev.cp, ev.mate, refutation))
+
+    best_cp = max((cp for _, cp, _, _ in raw if cp is not None), default=None)
+    return {
+        uci: {
+            "cp": cp,
+            "mate": mate,
+            "refutation_pv": refutation,
+            "motif": motif(cp, mate, best_cp),
+        }
+        for uci, cp, mate, refutation in raw
+    }

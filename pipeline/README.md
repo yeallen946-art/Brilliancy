@@ -37,17 +37,38 @@ venv + Stockfish loop works — the M0 pipeline acceptance criterion.
 pytest          # engine-free helper tests (no Stockfish binary needed)
 ```
 
-## Stages (full set lands M2)
+## Data flow
+
+PGN → `1_ingest` → work store (`content/work/<id>.json`) → `2_curate` (rank) → human pick
+→ `3_analyze` (mark guess points + fill `legal_evals`) → `4_annotate` (prose) →
+`5_validate` (gate) → `6_review` (human approve) → `7_build` → `content.sqlite` + daily JSON.
+
+The work store + `content.sqlite` + `daily/*.json` + `candidates.csv` are regenerable and
+git-ignored; PGN sources, the curation `selected.txt`, and review state are tracked.
+
+## Stages
 
 | Stage | File | Status |
 |---|---|---|
-| 1 ingest   | `1_ingest.py`   | M2 |
-| 2 curate   | `2_curate.py`   | M2 |
-| 3 analyze  | `3_analyze.py`  | M0: `--fen` single position · M2: `--game-id` full game |
-| 4 annotate | `4_annotate.py` | M2 (Claude API; needs `ANTHROPIC_API_KEY`) |
-| 5 validate | `5_validate.py` | M2 |
-| 6 review   | `6_review.py`   | M2 |
-| 7 build    | `7_build.py`    | M2 |
+| 1 ingest   | `1_ingest.py`   | ✅ done + tested |
+| 2 curate   | `2_curate.py`   | ✅ done + tested (ranks candidates → `candidates.csv`) |
+| 3 analyze  | `3_analyze.py`  | ✅ `--fen` · ✅ `--game-id` guess-point selection (tested); eval fill needs **Stockfish** |
+| 4 annotate | `4_annotate.py` | ⏳ next (Claude API; needs `ANTHROPIC_API_KEY`) |
+| 5 validate | `5_validate.py` | ✅ rules + known-bad tests |
+| 6 review   | `6_review.py`   | ⏳ next (review HTML) |
+| 7 build    | `7_build.py`    | ✅ done + tested (sqlite + daily JSON) |
+
+Engine-independent logic lives in importable modules (`ingest`, `curate`, `guesspoints`,
+`validate`, `build`, `store`); the numbered files are thin CLIs. Run order example:
+
+```bash
+python 1_ingest.py
+python 2_curate.py
+python 3_analyze.py --game-id <id>   # needs stockfish on PATH
+python 4_annotate.py --game-id <id>  # needs ANTHROPIC_API_KEY (stage not built yet)
+python 5_validate.py --all
+python 7_build.py
+```
 
 Hard rule: annotations are **only** produced by `4_annotate.py`, grounded in Stockfish
 lines, and must pass `5_validate.py` before shipping (CLAUDE.md / AGENTS.md).

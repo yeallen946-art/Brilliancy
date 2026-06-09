@@ -25,6 +25,10 @@ __pycache__/
 content/content.sqlite
 content/daily/*.json
 
+# Pipeline intermediates — regenerable from PGN sources (stages 1/3/4)
+content/work/
+content/curation/candidates.csv
+
 # Secrets — never commit
 .env
 *.p8
