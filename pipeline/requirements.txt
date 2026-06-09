@@ -1,6 +1,7 @@
 # Brilliancy content pipeline — Python 3.12 (TECH_SPEC §5).
 # Install into a venv: python -m venv .venv && .venv/Scripts/activate (Win) or
 # source .venv/bin/activate (mac), then: pip install -r requirements.txt
-python-chess==1.999    # board model, PGN/FEN/SAN, UCI engine driver
-anthropic>=0.40        # 4_annotate.py (Claude API; needs ANTHROPIC_API_KEY) — used from M2
+python-chess==1.999    # board model, PGN/FEN/SAN, UCI engine driver, board SVG (stage 6)
+anthropic>=0.40        # 4_annotate.py (Claude API; needs ANTHROPIC_API_KEY)
+pydantic>=2.0          # structured-output models for stage 4 (also an anthropic dep)
 pytest>=8.0            # test framework

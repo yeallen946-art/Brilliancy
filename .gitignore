@@ -28,6 +28,7 @@ content/daily/*.json
 # Pipeline intermediates — regenerable from PGN sources (stages 1/3/4)
 content/work/
 content/curation/candidates.csv
+content/review/*.html
 
 # Secrets — never commit
 .env

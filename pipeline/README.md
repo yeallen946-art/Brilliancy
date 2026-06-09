@@ -53,9 +53,9 @@ git-ignored; PGN sources, the curation `selected.txt`, and review state are trac
 | 1 ingest   | `1_ingest.py`   | ✅ done + tested |
 | 2 curate   | `2_curate.py`   | ✅ done + tested (ranks candidates → `candidates.csv`) |
 | 3 analyze  | `3_analyze.py`  | ✅ `--fen` · ✅ `--game-id` guess-point selection (tested); eval fill needs **Stockfish** |
-| 4 annotate | `4_annotate.py` | ⏳ next (Claude API; needs `ANTHROPIC_API_KEY`) |
+| 4 annotate | `4_annotate.py` | ✅ grounded prompt + schema + apply (tested); Batch API call needs `ANTHROPIC_API_KEY` |
 | 5 validate | `5_validate.py` | ✅ rules + known-bad tests |
-| 6 review   | `6_review.py`   | ⏳ next (review HTML) |
+| 6 review   | `6_review.py`   | ✅ review HTML (board + annotation) + approve/reject (tested) |
 | 7 build    | `7_build.py`    | ✅ done + tested (sqlite + daily JSON) |
 
 Engine-independent logic lives in importable modules (`ingest`, `curate`, `guesspoints`,
