@@ -26,7 +26,7 @@ final class BrilliancyUITests: XCTestCase {
         let session = app.otherElements["guessSessionView"]
         XCTAssertTrue(session.waitForExistence(timeout: 10), "GuessSession should present")
 
-        let board = app.otherElements["boardView"]
+        let board = app.descendants(matching: .any)["boardView"]
         XCTAssertTrue(board.waitForExistence(timeout: 10), "Board should be visible")
     }
 }

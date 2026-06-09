@@ -24,6 +24,7 @@ struct GuessSessionView: View {
         }
         .padding()
         .animation(.default, value: model.phase)
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("guessSessionView")
     }
 
