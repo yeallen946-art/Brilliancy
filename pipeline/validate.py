@@ -17,6 +17,8 @@ import chess
 from store import GameRecord, MoveRecord
 
 MAX_ANNOTATION_CHARS = 400
+# Reading level for 800-2000 improvers (TECH_SPEC §5, PRD): keep sentences digestible.
+MAX_SENTENCE_WORDS = 35
 
 WINNING_WORDS = ("winning", "crushing", "decisive", "completely won", "totally winning")
 EQUAL_WORDS = ("equal", "balanced", "level", "roughly equal")
@@ -44,6 +46,12 @@ def extract_san_tokens(text: str) -> list[str]:
     return SAN_TOKEN_RE.findall(text or "")
 
 
+def longest_sentence_words(text: str) -> int:
+    """Word count of the longest sentence (rough readability proxy)."""
+    sentences = re.split(r"[.!?]+", text or "")
+    return max((len(s.split()) for s in sentences), default=0)
+
+
 def _master_cp(move: MoveRecord) -> int | None:
     entry = move.legal_evals.get(move.uci)
     if entry is not None and entry.get("cp") is not None:
@@ -68,11 +76,17 @@ def validate_move(game_id: str, move: MoveRecord) -> list[ValidationError]:
     if not text:
         return errors
 
-    # 1) length
+    # 1) length + reading level
     if len(text) > MAX_ANNOTATION_CHARS:
         errors.append(ValidationError(
             game_id, move.ply, "too_long",
             f"annotation {len(text)} chars > {MAX_ANNOTATION_CHARS}",
+        ))
+    longest = longest_sentence_words(text)
+    if longest > MAX_SENTENCE_WORDS:
+        errors.append(ValidationError(
+            game_id, move.ply, "hard_to_read",
+            f"longest sentence is {longest} words > {MAX_SENTENCE_WORDS}",
         ))
 
     # 2) every mentioned move is legal AND in engine output (legal_evals)

@@ -193,3 +193,43 @@ def test_curate_scores_famous_decisive_game():
     assert scored.decisive is True
     assert scored.has_famous is True          # Fischer
     assert scored.score > 4.0
+
+
+# ------------------------------------------------------------- validate reading level
+
+def test_validate_flags_run_on_sentence():
+    import validate
+    long_text = "This is " + " ".join(["word"] * 40) + " and more."
+    move = MoveRecord(
+        ply=20, san="e4", uci="e2e4", fen_before=START_FEN, mover="white",
+        is_guess_point=True, annotation=long_text, legal_evals={"e2e4": {"cp": 30}},
+    )
+    codes = {e.code for e in validate.validate_move("g", move)}
+    assert "hard_to_read" in codes
+
+
+def test_validate_clean_sentence_not_flagged():
+    import validate
+    move = MoveRecord(
+        ply=20, san="e4", uci="e2e4", fen_before=START_FEN, mover="white",
+        is_guess_point=True, annotation="e4 grabs the center.",
+        legal_evals={"e2e4": {"cp": 30}},
+    )
+    assert validate.validate_move("g", move) == []
+
+
+# ----------------------------------------------------------------- pipeline planning
+
+def test_plan_stages_skips_gated_when_deps_missing():
+    import run_pipeline
+    bare = run_pipeline.plan_stages(has_engine=False, has_key=False)
+    assert "analyze" not in bare and "annotate" not in bare
+    assert bare == ["ingest", "curate", "validate", "build"]
+
+
+def test_plan_stages_full_chain_with_deps():
+    import run_pipeline
+    full = run_pipeline.plan_stages(has_engine=True, has_key=True)
+    assert full == ["ingest", "curate", "analyze", "annotate", "validate", "build"]
+    # annotate needs an engine too (it consumes legal_evals)
+    assert "annotate" not in run_pipeline.plan_stages(has_engine=False, has_key=True)
