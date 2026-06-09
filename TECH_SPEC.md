@@ -233,4 +233,11 @@ Render offscreen SwiftUI view → UIImage: app name, date, score band (emoji row
 
 - **Unit (required):** Scoring + rating math (pure functions — table-driven tests), SAN/FEN round-trips, guess-point gating of pipeline output, entitlement gating logic.
 - **Pipeline (required):** `5_validate.py` has its own test suite with known-bad annotations.
-- **Snapshot:** Bo
+- **Snapshot:** BoardView rendering, share card.
+- **Manual/TestFlight:** IAP flows (sandbox), full game UX with seed users.
+
+## 10. Out of Scope (V1)
+
+Backend/auth, Android, any on-device engine (everything is precomputed — `legal_evals` covers every legal move at each guess point, so there is no "unknown move" case), localization, iPad-optimized layout (runs scaled), Game Center.
+
+**Edge case — illegal/non-legal input:** the BoardView only allows legal moves, so every guess is in `legal_evals`. The only "missing" case is a guess at a non-guess-point (can't happen — UI only prompts at guess points). Never run an engine on device in V1.
