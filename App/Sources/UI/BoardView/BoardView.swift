@@ -71,6 +71,10 @@ struct BoardView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         }
         .aspectRatio(1, contentMode: .fit)
+        // Queryable as a single element in UI tests. `.contain` keeps the board a
+        // container (doesn't flatten squares) and doesn't affect the board-level gesture.
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("boardView")
     }
 
     // MARK: - Rendering

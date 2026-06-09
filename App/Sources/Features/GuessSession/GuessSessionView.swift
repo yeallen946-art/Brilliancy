@@ -24,6 +24,7 @@ struct GuessSessionView: View {
         }
         .padding()
         .animation(.default, value: model.phase)
+        .accessibilityIdentifier("guessSessionView")
     }
 
     // MARK: - Header
@@ -91,6 +92,7 @@ struct GuessSessionView: View {
         .padding(.vertical, 8).padding(.horizontal, 16)
         .background(bandColor(eval.band).opacity(0.18), in: Capsule())
         .foregroundStyle(bandColor(eval.band))
+        .accessibilityIdentifier("feedbackPanel")
     }
 
     private var annotationCard: some View {

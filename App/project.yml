@@ -66,15 +66,30 @@ targets:
       base:
         GENERATE_INFOPLIST_FILE: YES
 
+  BrilliancyUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: UITests
+    dependencies:
+      - target: Brilliancy
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Brilliancy # app under test for the UI runner
+
 schemes:
   Brilliancy:
     build:
       targets:
         Brilliancy: all
         BrilliancyTests: [test]
+        BrilliancyUITests: [test]
     run:
       config: Debug
     test:
       config: Debug
       targets:
         - BrilliancyTests
+        - BrilliancyUITests

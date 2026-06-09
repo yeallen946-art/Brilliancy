@@ -22,6 +22,7 @@ struct HomeView: View {
                 Button("Play today's game") { isPlaying = true }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
+                    .accessibilityIdentifier("playTodayButton")
 
                 Spacer()
 
