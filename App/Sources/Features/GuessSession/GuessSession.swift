@@ -24,6 +24,7 @@ final class GuessSessionModel {
     /// Per-guess-point outcome, accumulated for the summary.
     struct PointResult: Identifiable {
         let ply: Int
+        let guessedUci: String
         let evaluation: GuessEvaluation
         let masterUci: String
         let masterSan: String
@@ -122,6 +123,7 @@ final class GuessSessionModel {
 
         results.append(PointResult(
             ply: point.ply,
+            guessedUci: guessUci,
             evaluation: evaluation,
             masterUci: point.uci,
             masterSan: point.san,
@@ -184,4 +186,23 @@ struct TagStat: Identifiable {
     let hits: Int
     let total: Int
     var id: GuessTag { tag }
+}
+
+/// Everything the user DB needs from a finished session (TECH_SPEC §4 user.sqlite).
+struct GameOutcome {
+    let gameId: String
+    let totalScore: Int
+    let finalRating: Double
+    let guesses: [(ply: Int, uci: String, score: Int)]
+}
+
+extension GuessSessionModel {
+    var outcome: GameOutcome {
+        GameOutcome(
+            gameId: game.id,
+            totalScore: totalScore,
+            finalRating: rating,
+            guesses: results.map { ($0.ply, $0.guessedUci, $0.evaluation.displayPoints) }
+        )
+    }
 }

@@ -72,4 +72,16 @@ final class DailyChallengeTests: XCTestCase {
         XCTAssertNil(DailyChallenge.gameContent(fromJson: Data("not json".utf8)))
         XCTAssertNil(DailyChallenge.gameContent(fromJson: Data("{}".utf8)))
     }
+
+    func testFileNameAndUrlForDate() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        let date = calendar.date(from: DateComponents(year: 2026, month: 6, day: 10, hour: 12))!
+
+        XCTAssertEqual(DailyChallenge.fileName(for: date, calendar: calendar), "2026-06-10.json")
+        XCTAssertEqual(
+            DailyChallenge.url(for: date, calendar: calendar).absoluteString,
+            "https://yeallen946-art.github.io/brilliancy-content/daily/2026-06-10.json"
+        )
+    }
 }

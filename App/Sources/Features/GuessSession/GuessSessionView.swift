@@ -4,10 +4,23 @@ import SwiftUI
 /// Visual flow: top bar → board → feedback bar → annotation card (the star) → gold button.
 struct GuessSessionView: View {
     @State private var model: GuessSessionModel
+    @State private var recorded = false
     private let onClose: () -> Void
+    private let userStore: UserStore?
+    private let isDaily: Bool
 
-    init(game: GameContent, onClose: @escaping () -> Void = {}) {
-        _model = State(initialValue: GuessSessionModel(game: game))
+    init(game: GameContent,
+         userStore: UserStore? = nil,
+         isDaily: Bool = false,
+         onClose: @escaping () -> Void = {}) {
+        // Rating continuity (TECH_SPEC §3.3): start from the last persisted snapshot.
+        var config = ScoringConfig.default
+        if let store = userStore {
+            config.startRating = store.latestRating(default: config.startRating)
+        }
+        _model = State(initialValue: GuessSessionModel(game: game, config: config))
+        self.userStore = userStore
+        self.isDaily = isDaily
         self.onClose = onClose
     }
 
@@ -42,6 +55,12 @@ struct GuessSessionView: View {
                     model.stepAutoplay()
                 }
             }
+        }
+        // Persist the finished session exactly once (TECH_SPEC §4 user.sqlite).
+        .task(id: model.phase == .summary) {
+            guard model.phase == .summary, !recorded, let store = userStore else { return }
+            recorded = true
+            store.record(model.outcome, isDaily: isDaily)
         }
     }
 

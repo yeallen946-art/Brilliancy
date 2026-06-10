@@ -40,6 +40,23 @@ enum DailyChallenge {
         let annotation: String?
     }
 
+    // MARK: - CDN location
+
+    /// Content CDN (GitHub Pages, repo yeallen946-art/brilliancy-content). Swapping
+    /// CDN later = change this one constant (TECH_SPEC §2: Cloudflare is the upgrade
+    /// path if/when a custom domain or cache control is wanted).
+    static let baseURL = URL(string: "https://yeallen946-art.github.io/brilliancy-content/daily/")!
+
+    /// "2026-06-10.json" — keyed by the user's LOCAL calendar date.
+    static func fileName(for date: Date, calendar: Calendar = .current) -> String {
+        let parts = calendar.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04d-%02d-%02d.json", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
+    }
+
+    static func url(for date: Date, calendar: Calendar = .current) -> URL {
+        baseURL.appendingPathComponent(fileName(for: date, calendar: calendar))
+    }
+
     // MARK: - Decode
 
     /// Decode a daily-challenge JSON payload into the runtime model.
