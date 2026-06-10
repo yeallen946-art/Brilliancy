@@ -54,6 +54,7 @@ targets:
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait"
         TARGETED_DEVICE_FAMILY: "1" # iPhone only in V1 (iPad runs scaled, TECH_SPEC §10)
+        ASSETCATALOG_COMPILER_APPICON_NAME: "" # App icon is not designed yet; don't ask actool for AppIcon.
 
   BrilliancyTests:
     type: bundle.unit-test

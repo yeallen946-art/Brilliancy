@@ -6,5 +6,5 @@ anthropic>=0.40        # 4_annotate.py (Claude API; needs ANTHROPIC_API_KEY)
 pydantic>=2.0          # structured-output models for stage 4 (also an anthropic dep)
 pytest>=8.0            # test framework
 # Asset tooling (only for tools/gen_piece_assets.py — regenerating the cburnett piece set):
-svglib>=1.5            # SVG -> ReportLab drawing
+svglib>=1.5,<1.6       # SVG -> ReportLab drawing; 1.6 pulls pycairo/system cairo.
 reportlab>=4.0         # drawing -> vector PDF for the Xcode asset catalog
