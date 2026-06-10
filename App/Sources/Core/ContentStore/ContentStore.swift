@@ -94,7 +94,13 @@ enum ContentStore {
         guard let data = json?.data(using: .utf8),
               let entries = try? JSONDecoder().decode([String: EvalEntry].self, from: data)
         else { return [:] }
-        return entries.mapValues { entry in
+        return clampedEvals(entries)
+    }
+
+    /// Mate-clamp a decoded legal_evals map. Shared by the DB path and the daily-JSON
+    /// path so a mating move always outranks any cp move, identically.
+    static func clampedEvals(_ entries: [String: EvalEntry]) -> [String: Int] {
+        entries.mapValues { entry in
             if let mate = entry.mate {
                 return mate > 0 ? mateBaseCp - mate * 100 : -mateBaseCp - mate * 100
             }
