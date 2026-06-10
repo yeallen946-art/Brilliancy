@@ -35,6 +35,7 @@ def main() -> int:
         return 1
 
     seen = store.existing_source_hashes(args.work_dir)
+    decisions = store.load_decisions()  # restore human approvals after a work-store wipe
     added = skipped = 0
 
     for path in _pgn_files(args.source):
@@ -44,9 +45,12 @@ def main() -> int:
                     skipped += 1
                     continue
                 seen.add(game.source_hash)
+                if game.id in decisions:
+                    game.review_status = decisions[game.id]
                 store.save_game(game, args.work_dir)
                 added += 1
-                print(f"+ {game.id}  ({game.white} vs {game.black}, {game.year})")
+                restored = " (review restored)" if game.id in decisions else ""
+                print(f"+ {game.id}  ({game.white} vs {game.black}, {game.year}){restored}")
 
     print(f"\nIngested {added} game(s), skipped {skipped} duplicate(s).")
     return 0

@@ -48,6 +48,31 @@ def test_move_character():
     assert facts.move_character(START_FEN, "e2e4") == []
 
 
+# ------------------------------------------------------------- tactical motifs
+
+def test_motif_knight_fork_king_and_queen():
+    # Nd4-c6+ forks the b8 king and e7 queen.
+    fen = "1k6/4q3/8/8/3N4/8/8/K7 w - - 0 1"
+    assert "fork" in facts.tactical_motifs(fen, "d4c6")
+
+
+def test_motif_rook_pin():
+    # Ra1-e1 pins the e5 queen against the e8 king (white king on g1, off the rook's path).
+    fen = "4k3/8/8/4q3/8/8/8/R5K1 w - - 0 1"
+    assert "pin" in facts.tactical_motifs(fen, "a1e1")
+
+
+def test_motif_discovered_check():
+    # Nd5 moves away; the d1 rook gives discovered check to the d8 king.
+    fen = "3k4/8/8/3N4/8/8/8/3RK3 w - - 0 1"
+    motifs = facts.tactical_motifs(fen, "d5f6")
+    assert "discovered_check" in motifs
+
+
+def test_motif_quiet_move_has_none():
+    assert facts.tactical_motifs(START_FEN, "e2e4") == []
+
+
 # ----------------------------------------------------- mate-claim validation (C2)
 
 def _reti_move(annotation):

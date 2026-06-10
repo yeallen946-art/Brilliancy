@@ -114,6 +114,29 @@ def existing_source_hashes(work_dir: str = WORK_DIR) -> set[str]:
     return {g.source_hash for g in load_all_games(work_dir)}
 
 
+# ------------------------------------------------------------- review decisions
+# Human approve/reject decisions are the one thing in the work store that can't be
+# regenerated — persist them in a TRACKED file so wiping content/work/ doesn't lose them.
+
+DECISIONS_FILE = os.path.join(CONTENT_DIR, "review", "decisions.json")
+
+
+def load_decisions(path: str = DECISIONS_FILE) -> dict[str, str]:
+    """game_id -> review status ('approved'/'rejected'). Empty if no file."""
+    if not os.path.exists(path):
+        return {}
+    with open(path, encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+def record_decision(game_id: str, status: str, path: str = DECISIONS_FILE) -> None:
+    decisions = load_decisions(path)
+    decisions[game_id] = status
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8", newline="\n") as fh:
+        json.dump(decisions, fh, indent=2, sort_keys=True)
+
+
 # ---------------------------------------------------------------- curation selection
 
 SELECTED_FILE = os.path.join(CURATION_DIR, "selected.txt")

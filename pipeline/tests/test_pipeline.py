@@ -309,3 +309,14 @@ def test_load_selected_reads_ids(tmp_path):
     with open(path, "w", encoding="utf-8") as fh:
         fh.write("a-1\n# skip\nb-2\n")
     assert store.load_selected(path) == {"a-1", "b-2"}
+
+
+# ------------------------------------------------------------- review decisions
+
+def test_decisions_roundtrip_and_overwrite(tmp_path):
+    path = os.path.join(tmp_path, "decisions.json")
+    assert store.load_decisions(path) == {}
+    store.record_decision("g1", "approved", path)
+    store.record_decision("g2", "rejected", path)
+    store.record_decision("g2", "approved", path)   # decision can be revised
+    assert store.load_decisions(path) == {"g1": "approved", "g2": "approved"}

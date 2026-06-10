@@ -33,7 +33,9 @@ def _set_status(game_id: str, status: str, work_dir: str) -> None:
     game = store.load_game(game_id, work_dir)
     game.review_status = status
     store.save_game(game, work_dir)
-    print(f"{game_id}: review_status = {status}")
+    # Also persist to the tracked decisions file — survives a work-store wipe.
+    store.record_decision(game_id, status)
+    print(f"{game_id}: review_status = {status} (recorded in {store.DECISIONS_FILE})")
 
 
 def main() -> int:

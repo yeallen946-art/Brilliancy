@@ -107,6 +107,61 @@ def line_material(fen_before: str, uci: str, continuation: list[str]) -> LineMat
     return result
 
 
+def tactical_motifs(fen_before: str, uci: str) -> list[str]:
+    """Detect simple tactical motifs created by `uci` (TECH_SPEC §5.1, incremental).
+
+    Deterministic and conservative — only patterns that are unambiguous from the board:
+    - "fork": the moved piece attacks >=2 enemy non-pawn pieces, at least one of them
+      king/queen/rook (the classic family fork shape).
+    - "pin": an enemy piece is absolutely pinned after the move that wasn't before.
+    - "discovered_check": the position is check but the moved piece is not a checker.
+    Skewers/batteries etc. are future increments — better to miss a motif than invent one.
+    """
+    board = chess.Board(fen_before)
+    try:
+        move = chess.Move.from_uci(uci)
+    except ValueError:
+        return []
+    if not board.is_legal(move):
+        return []
+    mover = board.turn
+    opponent = not mover
+
+    pinned_before = {
+        sq for sq in chess.SQUARES
+        if (p := board.piece_at(sq)) and p.color == opponent and board.is_pinned(opponent, sq)
+    }
+    board.push(move)
+
+    motifs: list[str] = []
+
+    # fork — from the moved piece's destination square
+    big_targets = 0
+    any_targets = 0
+    for sq in board.attacks(move.to_square):
+        victim = board.piece_at(sq)
+        if victim and victim.color == opponent and victim.piece_type != chess.PAWN:
+            any_targets += 1
+            if victim.piece_type in (chess.KING, chess.QUEEN, chess.ROOK):
+                big_targets += 1
+    if any_targets >= 2 and big_targets >= 1:
+        motifs.append("fork")
+
+    # pin — newly pinned enemy piece
+    pinned_after = {
+        sq for sq in chess.SQUARES
+        if (p := board.piece_at(sq)) and p.color == opponent and board.is_pinned(opponent, sq)
+    }
+    if pinned_after - pinned_before:
+        motifs.append("pin")
+
+    # discovered check — it's check, but not (only) from the moved piece
+    if board.is_check() and move.to_square not in board.checkers():
+        motifs.append("discovered_check")
+
+    return motifs
+
+
 def move_character(fen_before: str, uci: str) -> list[str]:
     """Simple computed character tags for one move: check / capture / mate / promotion."""
     board = chess.Board(fen_before)

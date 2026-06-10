@@ -34,11 +34,11 @@ def main() -> int:
         for e in errors:
             print(f"[{e.code}] {e.game_id} ply {e.ply}: {e.message}")
 
-    checked = sum(len(g.guess_points) for g in games)
+    annotated = sum(1 for g in games for m in g.guess_points if m.annotation)
     if total_errors:
-        print(f"\nFAIL: {total_errors} error(s) across {checked} annotated guess point(s).")
+        print(f"\nFAIL: {total_errors} error(s) across {annotated} annotated guess point(s).")
         return 1
-    print(f"\nOK: {checked} annotated guess point(s) passed validation.")
+    print(f"\nOK: {annotated} annotated guess point(s) passed validation.")
     return 0
 
 

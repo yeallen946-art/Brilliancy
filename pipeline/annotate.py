@@ -154,11 +154,14 @@ def build_move_prompt(game: GameRecord, move: MoveRecord) -> str:
         refutation = entry.get("refutation_pv") or []
         ref = f"  reply: {' '.join(refutation)}" if refutation else ""
         lines.append(f"  {r['san']:7s} {r['eval']:>6s}  ({r['motif']}){tag}{ref}")
-        # Computed facts per candidate (the only material/mate claims allowed):
+        # Computed facts per candidate (the only material/mate/tactic claims allowed):
         mat = facts.line_material(move.fen_before, r["uci"], refutation)
         if mat.captures:
             lines.append(f"           captures in line: {', '.join(mat.captures)} "
                          f"(net {mat.net_pawns:+d} pawn-units for the mover)")
+        motifs = facts.tactical_motifs(move.fen_before, r["uci"])
+        if motifs:
+            lines.append(f"           tactics: {', '.join(m.replace('_', ' ') for m in motifs)}")
         pattern = facts.mate_pattern(move.fen_before, r["uci"])
         if pattern.is_mate:
             lines.append(f"           MATE FACTS: checking piece(s): {', '.join(pattern.checkers)}; "
