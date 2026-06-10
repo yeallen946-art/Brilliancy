@@ -9,10 +9,9 @@ struct HomeView: View {
     @State private var userStore = UserStore.onDisk()
 
     /// Pipeline content from the bundled content.sqlite (GRDB path Mac-verified,
-    /// issue #3). The M1 Byrne–Fischer sample (placeholder evals, also used by unit
-    /// tests) is appended last — guarantees the library is never empty.
-    private let library: [GameContent] =
-        ContentStore.bundledGames() + [SampleGames.gameOfTheCentury]
+    /// issue #3). User-visible content comes from the DB; the M1 sample remains only
+    /// as a test fixture for the guess-session state machine.
+    private let library: [GameContent] = ContentStore.bundledGames()
 
     private var featured: GameContent { dailyGame ?? library[0] }
 
