@@ -4,9 +4,11 @@ import SwiftUI
 /// CDN (cache-backed), falling back to the first bundled game while offline/loading.
 /// Visual system per UI_FLOW §4.1: dark shell, gold CTA (and streak), surface cards.
 struct HomeView: View {
+    /// Shared app-wide store, owned by RootTabView (one user.sqlite connection).
+    let userStore: UserStore?
+
     @State private var playing: GameContent?
     @State private var dailyGame: GameContent?
-    @State private var userStore = UserStore.onDisk()
 
     /// Pipeline content from the bundled content.sqlite (GRDB path Mac-verified,
     /// issue #3). User-visible content comes from the DB; the M1 sample remains only
@@ -116,5 +118,5 @@ struct HomeView: View {
 }
 
 #Preview {
-    HomeView()
+    HomeView(userStore: UserStore.onDisk())
 }
