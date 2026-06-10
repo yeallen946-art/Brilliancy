@@ -39,6 +39,12 @@ struct HomeView: View {
                             .font(.footnote)
                             .foregroundStyle(Theme.textSecondary)
                             .padding(.top, Theme.Space.xs)
+
+                        Text("Pieces: cburnett by Colin M.L. Burnett · CC BY-SA 3.0")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Theme.textSecondary.opacity(0.7))
+                            .multilineTextAlignment(.center)
+                            .padding(.top, Theme.Space.lg)
                     }
                     .padding(Theme.Space.md)
                 }

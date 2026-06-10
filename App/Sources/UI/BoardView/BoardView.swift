@@ -104,19 +104,14 @@ struct BoardView: View {
         .frame(width: size, height: size)
     }
 
-    /// Placeholder piece: filled silhouette with a contrast outline (fill glyph behind,
-    /// scaled up, in the outline color). Replaced by bundled cburnett SVGs later.
+    /// Bundled cburnett piece (UI_FLOW §4.1). Each SVG fills a 45×45 box with the piece's
+    /// natural proportions (pawns smaller), so a uniform frame gives correct relative sizes.
     private func pieceView(_ piece: PlacedPiece, size: CGFloat) -> some View {
-        let fill = piece.color == .white ? Theme.pieceLightFill : Theme.pieceDarkFill
-        let outline = piece.color == .white ? Theme.pieceLightOutline : Theme.pieceDarkOutline
-        // Big pieces ~90% of the cell, pawns ~65% (UI_FLOW §4.1).
-        let fontSize = size * (piece.kind == .pawn ? 0.66 : 0.9)
-        return ZStack {
-            Text(piece.silhouette).font(.system(size: fontSize))
-                .foregroundStyle(outline).scaleEffect(1.10)
-            Text(piece.silhouette).font(.system(size: fontSize))
-                .foregroundStyle(fill)
-        }
+        Image(piece.assetName)
+            .resizable()
+            .interpolation(.high)
+            .aspectRatio(contentMode: .fit)
+            .frame(width: size * 0.92, height: size * 0.92)
     }
 
     /// Center point of a square in board-local coordinates (top-left origin), honoring orientation.

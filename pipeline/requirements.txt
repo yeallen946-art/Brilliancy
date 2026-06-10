@@ -5,3 +5,6 @@ python-chess==1.999    # board model, PGN/FEN/SAN, UCI engine driver, board SVG 
 anthropic>=0.40        # 4_annotate.py (Claude API; needs ANTHROPIC_API_KEY)
 pydantic>=2.0          # structured-output models for stage 4 (also an anthropic dep)
 pytest>=8.0            # test framework
+# Asset tooling (only for tools/gen_piece_assets.py — regenerating the cburnett piece set):
+svglib>=1.5            # SVG -> ReportLab drawing
+reportlab>=4.0         # drawing -> vector PDF for the Xcode asset catalog

@@ -70,8 +70,8 @@ struct PlacedPiece: Hashable {
         }
     }
 
-    /// Filled silhouette glyph (always the solid set), tinted + outlined by color at
-    /// render time for contrast on the green board — placeholder until cburnett SVGs.
+    /// Filled silhouette glyph (always the solid set). Fallback if the cburnett asset
+    /// is unavailable; tinted + outlined by color at render time.
     var silhouette: String {
         switch kind {
         case .king:   return "\u{265A}"
@@ -81,6 +81,21 @@ struct PlacedPiece: Hashable {
         case .knight: return "\u{265E}"
         case .pawn:   return "\u{265F}"
         }
+    }
+
+    /// Asset-catalog name for the bundled cburnett piece, e.g. "piece_wN".
+    var assetName: String {
+        let colorCode = color == .white ? "w" : "b"
+        let kindCode: String
+        switch kind {
+        case .king:   kindCode = "K"
+        case .queen:  kindCode = "Q"
+        case .rook:   kindCode = "R"
+        case .bishop: kindCode = "B"
+        case .knight: kindCode = "N"
+        case .pawn:   kindCode = "P"
+        }
+        return "piece_\(colorCode)\(kindCode)"
     }
 }
 
