@@ -1,0 +1,61 @@
+# CI — automates the mechanical half of the macOS verification loop (AGENTS.md):
+# every push builds + tests the iOS app on a GitHub macOS runner and runs the
+# pipeline tests on Linux. Codex/Mac remains for simulator eyeballing and
+# judgment calls; `needs-mac-verify` issues shrink to just those parts.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  ios:
+    name: iOS build + test
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate project
+        working-directory: App
+        run: xcodegen generate
+
+      - name: Pick an available iPhone simulator
+        id: sim
+        run: |
+          DEVICE=$(xcrun simctl list devices available \
+            | grep -E '^\s+iPhone' | head -1 | sed -E 's/^ *(.+) \([0-9A-F-]+\).*/\1/')
+          if [ -z "$DEVICE" ]; then echo "No iPhone simulator found"; exit 1; fi
+          echo "device=$DEVICE" >> "$GITHUB_OUTPUT"
+          echo "Using simulator: $DEVICE"
+
+      - name: Build and test
+        working-directory: App
+        run: |
+          set -o pipefail
+          xcodebuild -scheme Brilliancy \
+            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.device }}" \
+            test
+
+  pipeline:
+    name: Pipeline tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        working-directory: pipeline
+        run: pip install -r requirements.txt
+
+      - name: pytest
+        working-directory: pipeline
+        run: pytest -q
