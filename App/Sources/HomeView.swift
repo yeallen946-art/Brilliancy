@@ -1,8 +1,7 @@
 import SwiftUI
 
 /// M1 home (stand-in for S1 "Today"). Launches a GuessSession for a chosen game.
-/// Featured = the Opera Game (real pipeline content: Stockfish evals + grounded
-/// annotations). The full Today/Train/Progress tabs (UI_FLOW §1) come later.
+/// Visual system per UI_FLOW §4.1: dark shell, gold CTA, surface cards.
 struct HomeView: View {
     @State private var playing: GameContent?
 
@@ -15,45 +14,65 @@ struct HomeView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 20) {
-                    VStack(spacing: 8) {
-                        Text(featured.title)
-                            .font(.title.bold()).multilineTextAlignment(.center)
-                        Text(featured.subtitle)
-                            .font(.subheadline).foregroundStyle(.secondary)
-                    }
-
-                    Button("Play today's game") { playing = featured }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.large)
-                        .accessibilityIdentifier("playTodayButton")
-
-                    Divider()
-
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Library").font(.headline)
-                        ForEach(library) { game in
-                            Button { playing = game } label: {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(game.title).font(.body.weight(.semibold))
-                                    Text(game.subtitle)
-                                        .font(.caption).foregroundStyle(.secondary)
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                            .buttonStyle(.bordered)
+            ZStack {
+                Theme.background.ignoresSafeArea()
+                ScrollView {
+                    VStack(spacing: Theme.Space.lg) {
+                        VStack(spacing: Theme.Space.xs) {
+                            Text(featured.title)
+                                .font(.system(size: 26, weight: .medium))
+                                .foregroundStyle(Theme.textPrimary)
+                                .multilineTextAlignment(.center)
+                            Text(featured.subtitle)
+                                .font(.system(size: 13))
+                                .foregroundStyle(Theme.textSecondary)
                         }
-                    }
+                        .padding(.top, Theme.Space.lg)
 
-                    NavigationLink("Board sandbox (debug)") { BoardSandboxView() }
-                        .font(.footnote)
+                        Button("Play today's game") { playing = featured }
+                            .buttonStyle(GoldButtonStyle())
+                            .accessibilityIdentifier("playTodayButton")
+
+                        librarySection
+
+                        NavigationLink("Board sandbox (debug)") { BoardSandboxView() }
+                            .font(.footnote)
+                            .foregroundStyle(Theme.textSecondary)
+                            .padding(.top, Theme.Space.xs)
+                    }
+                    .padding(Theme.Space.md)
                 }
-                .padding()
             }
             .navigationTitle("Brilliancy")
+            .toolbarColorScheme(.dark, for: .navigationBar)
             .fullScreenCover(item: $playing) { game in
                 GuessSessionView(game: game) { playing = nil }
+            }
+        }
+        .preferredColorScheme(.dark)
+        .tint(Theme.gold)
+    }
+
+    private var librarySection: some View {
+        VStack(alignment: .leading, spacing: Theme.Space.sm) {
+            Text("LIBRARY")
+                .font(.system(size: 11, weight: .medium))
+                .kerning(0.8)
+                .foregroundStyle(Theme.textSecondary)
+            ForEach(library) { game in
+                Button { playing = game } label: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(game.title)
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(Theme.textPrimary)
+                        Text(game.subtitle)
+                            .font(.system(size: 11))
+                            .foregroundStyle(Theme.textSecondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .cardSurface(padding: Theme.Space.sm)
+                }
+                .buttonStyle(.plain)
             }
         }
     }

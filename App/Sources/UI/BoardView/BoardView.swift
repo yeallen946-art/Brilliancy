@@ -27,9 +27,6 @@ struct BoardView: View {
     /// Legal destinations for the selected square, highlighted.
     @State private var highlights: Set<Sq> = []
 
-    private let lightColor = Color(red: 0.93, green: 0.85, blue: 0.71)
-    private let darkColor  = Color(red: 0.55, green: 0.40, blue: 0.27)
-
     /// All 64 squares (file 0…7, rank 0…7).
     private static let allSquares: [Sq] = (0..<8).flatMap { rank in
         (0..<8).map { file in Sq(file: file, rank: rank) }
@@ -81,27 +78,45 @@ struct BoardView: View {
 
     private func cell(_ sq: Sq, piece: PlacedPiece?, size: CGFloat) -> some View {
         ZStack {
-            Rectangle().fill(sq.isLight ? lightColor : darkColor)
+            Rectangle().fill(sq.isLight ? Theme.boardLight : Theme.boardDark)
 
-            if selected == sq {
-                Rectangle().fill(Color.yellow.opacity(0.4))
+            // Last-move / master-move emphasis: full-square yellow overlay (UI_FLOW §4.1).
+            if emphasis.contains(sq) {
+                Rectangle().fill(sq.isLight ? Theme.highlightLight : Theme.highlightDark)
             }
-            if highlights.contains(sq) {
-                Circle()
-                    .fill(Color.green.opacity(0.45))
-                    .frame(width: size * 0.32, height: size * 0.32)
+            // Tap selection: lighter full-square tint.
+            if selected == sq {
+                Rectangle().fill(Theme.highlightLight.opacity(0.55))
             }
             if let piece {
-                Text(piece.glyph)
-                    .font(.system(size: size * 0.82))
-                    .minimumScaleFactor(0.5)
+                pieceView(piece, size: size)
             }
-            if emphasis.contains(sq) {
-                Rectangle()
-                    .strokeBorder(Color.orange, lineWidth: max(2, size * 0.07))
+            // Legal-move affordance, drawn on top: dot on an empty square, ring on a capture.
+            if highlights.contains(sq) {
+                if piece == nil {
+                    Circle().fill(Color.black.opacity(0.16))
+                        .frame(width: size * 0.30, height: size * 0.30)
+                } else {
+                    Circle().strokeBorder(Color.black.opacity(0.16), lineWidth: size * 0.09)
+                }
             }
         }
         .frame(width: size, height: size)
+    }
+
+    /// Placeholder piece: filled silhouette with a contrast outline (fill glyph behind,
+    /// scaled up, in the outline color). Replaced by bundled cburnett SVGs later.
+    private func pieceView(_ piece: PlacedPiece, size: CGFloat) -> some View {
+        let fill = piece.color == .white ? Theme.pieceLightFill : Theme.pieceDarkFill
+        let outline = piece.color == .white ? Theme.pieceLightOutline : Theme.pieceDarkOutline
+        // Big pieces ~90% of the cell, pawns ~65% (UI_FLOW §4.1).
+        let fontSize = size * (piece.kind == .pawn ? 0.66 : 0.9)
+        return ZStack {
+            Text(piece.silhouette).font(.system(size: fontSize))
+                .foregroundStyle(outline).scaleEffect(1.10)
+            Text(piece.silhouette).font(.system(size: fontSize))
+                .foregroundStyle(fill)
+        }
     }
 
     /// Center point of a square in board-local coordinates (top-left origin), honoring orientation.

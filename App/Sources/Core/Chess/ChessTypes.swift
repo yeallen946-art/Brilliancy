@@ -69,6 +69,19 @@ struct PlacedPiece: Hashable {
         case (.black, .pawn):   return "\u{265F}"
         }
     }
+
+    /// Filled silhouette glyph (always the solid set), tinted + outlined by color at
+    /// render time for contrast on the green board — placeholder until cburnett SVGs.
+    var silhouette: String {
+        switch kind {
+        case .king:   return "\u{265A}"
+        case .queen:  return "\u{265B}"
+        case .rook:   return "\u{265C}"
+        case .bishop: return "\u{265D}"
+        case .knight: return "\u{265E}"
+        case .pawn:   return "\u{265F}"
+        }
+    }
 }
 
 enum FEN {

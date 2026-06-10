@@ -1,41 +1,41 @@
 import SwiftUI
 
-/// S3 — single-game summary (UI_FLOW §3). Score, rating delta, per-point band row,
-/// per-tag breakdown. Share + Review land in M3; this is the M1 functional version.
+/// S3 — single-game summary (UI_FLOW §3/§4.1). Score, rating delta, per-point band row,
+/// per-tag breakdown. Share + Review land in M3.
 struct GameSummaryView: View {
     let model: GuessSessionModel
     var onClose: () -> Void
 
     var body: some View {
-        VStack(spacing: 20) {
-            Text("Game complete").font(.title2.bold())
+        VStack(spacing: Theme.Space.lg) {
+            Text("Game complete")
+                .font(.system(size: 22, weight: .medium)).foregroundStyle(Theme.textPrimary)
 
-            Text("Score \(model.totalScore)")
-                .font(.system(size: 44, weight: .bold, design: .rounded))
+            Text("\(model.totalScore)")
+                .font(.system(size: 52, weight: .medium, design: .rounded))
+                .foregroundStyle(Theme.gold)
 
             HStack(spacing: 6) {
-                Text("Guess Rating \(Int(model.rating.rounded()))").font(.headline)
+                Text("Guess Rating \(Int(model.rating.rounded()))")
+                    .font(.system(size: 15, weight: .medium)).foregroundStyle(Theme.textPrimary)
                 ratingDeltaLabel
             }
 
             if !model.bands.isEmpty {
                 Text(model.bands.map(\.emoji).joined())
-                    .font(.title3)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.center)
+                    .font(.title3).lineLimit(2).multilineTextAlignment(.center)
             }
 
             if !model.tagBreakdown().isEmpty {
                 VStack(spacing: 4) {
                     ForEach(model.tagBreakdown()) { row in
                         Text("\(row.tag.label) \(row.hits)/\(row.total)")
-                            .font(.subheadline).foregroundStyle(.secondary)
+                            .font(.system(size: 13)).foregroundStyle(Theme.textSecondary)
                     }
                 }
             }
 
-            Button("Done") { onClose() }
-                .buttonStyle(.borderedProminent)
+            Button("Done") { onClose() }.buttonStyle(GoldButtonStyle())
 
             // Share / Review moves arrive in M3 (TECH_SPEC §7) — intentionally omitted here.
         }
@@ -46,11 +46,13 @@ struct GameSummaryView: View {
     private var ratingDeltaLabel: some View {
         let delta = model.ratingDelta
         if delta > 0 {
-            Text("\u{25B2} +\(delta)").foregroundStyle(.green).font(.headline)
+            Text("\u{25B2} +\(delta)").foregroundStyle(Theme.feedbackGreen)
+                .font(.system(size: 15, weight: .medium))
         } else if delta < 0 {
-            Text("\u{25BC} \(delta)").foregroundStyle(.red).font(.headline)
+            Text("\u{25BC} \(delta)").foregroundStyle(Theme.feedbackRed)
+                .font(.system(size: 15, weight: .medium))
         } else {
-            Text("\u{2014}").foregroundStyle(.secondary)
+            Text("\u{2014}").foregroundStyle(Theme.textSecondary)
         }
     }
 }
