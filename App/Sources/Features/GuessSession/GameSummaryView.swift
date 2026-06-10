@@ -1,10 +1,13 @@
 import SwiftUI
 
 /// S3 — single-game summary (UI_FLOW §3/§4.1). Score, rating delta, per-point band row,
-/// per-tag breakdown. Share + Review land in M3.
+/// per-tag breakdown, share card (TECH_SPEC §7). Review-moves lands later.
 struct GameSummaryView: View {
     let model: GuessSessionModel
+    var userStore: UserStore?
     var onClose: () -> Void
+
+    @State private var shareImage: Image?
 
     var body: some View {
         VStack(spacing: Theme.Space.lg) {
@@ -35,11 +38,32 @@ struct GameSummaryView: View {
                 }
             }
 
-            Button("Done") { onClose() }.buttonStyle(GoldButtonStyle())
+            if let shareImage {
+                ShareLink(
+                    item: shareImage,
+                    preview: SharePreview("Brilliancy \u{2014} \(model.totalScore)", image: shareImage)
+                ) {
+                    Text("Share")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(Theme.gold)
+                }
+            }
 
-            // Share / Review moves arrive in M3 (TECH_SPEC §7) — intentionally omitted here.
+            Button("Done") { onClose() }.buttonStyle(GoldButtonStyle())
         }
         .frame(maxWidth: .infinity)
+        .task {
+            // Render once; streak is read AFTER the session was recorded (the recording
+            // task in GuessSessionView runs on the same summary transition).
+            if shareImage == nil, !model.bands.isEmpty {
+                shareImage = ShareCard.render(ShareCardData(
+                    date: Date(),
+                    score: model.totalScore,
+                    bands: model.bands,
+                    streak: userStore?.streak.current ?? 0
+                ))
+            }
+        }
     }
 
     @ViewBuilder

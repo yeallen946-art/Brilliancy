@@ -34,7 +34,7 @@ struct GuessSessionView: View {
                 case .autoplaying:   autoplayView
                 case .awaitingGuess: guessView
                 case .revealed:      revealView
-                case .summary:       GameSummaryView(model: model, onClose: onClose)
+                case .summary:       GameSummaryView(model: model, userStore: userStore, onClose: onClose)
                 }
                 Spacer(minLength: 0)
             }
