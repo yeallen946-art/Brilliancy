@@ -8,7 +8,7 @@ struct HomeView: View {
     private let featured = SampleGames.operaGame
     private let library: [GameContent] = [
         SampleGames.operaGame,
-        SampleGames.retiDoubleBishop,
+        SampleGames.reti,
         SampleGames.gameOfTheCentury,
     ]
 

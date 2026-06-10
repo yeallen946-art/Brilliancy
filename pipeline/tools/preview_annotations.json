@@ -3,7 +3,7 @@
     "narrative_intro": "Vienna, 1910. Richard Reti, soon to be a hypermodern pioneer, has White against Savielly Tartakower. Black has just grabbed a knight on e4, expecting a normal game — but the position is about to detonate. You are White.",
     "moves": {
       "17": {
-        "annotation": "Qd8+!! hurls the queen onto an empty square to tear open the king. Black is forced to take, and the two bishops then hunt the king down to mate. The quiet Re1 keeps an edge but misses the kill; Nf3, Bb4, and Qe2 all let Black escape with the extra piece.",
+        "annotation": "Qd8+!! hurls the queen onto an empty square to tear open the king. Black is forced to take, and the bishop and rook then hunt the king down to mate. The quiet Re1 keeps an edge but misses the kill; Nf3, Bb4, and Qe2 all let Black escape with the extra piece.",
         "alt_annotations": {
           "d1e1": "Sensible and still a touch better for White, but it misses the forced mate that starts with Qd8+.",
           "g1f3": "Too slow: Black's queen escapes with tempo and grabs a pawn, taking over.",
@@ -12,7 +12,7 @@
         }
       },
       "19": {
-        "annotation": "Bg5+!! is the only move that justifies the queen sacrifice, driving the king into the corner where the bishop mates next. Every alternative leaves White a whole queen down for nothing: Nf3, Ba5+, Bf4+, and Bc3+ all simply lose.",
+        "annotation": "Bg5+!! is the only move that justifies the queen sacrifice. It drives the king to the side, where the bishop delivers mate next while the rook guards the file. Every alternative leaves White a whole queen down: Nf3, Ba5+, Bf4+, and Bc3+ all simply lose.",
         "alt_annotations": {
           "g1f3": "Develops, but White is a queen down with no follow-up — Black is winning.",
           "d2a5": "A check, but unlike Bg5+ it doesn't lead to mate — the king escapes and White stays a queen down.",
@@ -21,7 +21,7 @@
         }
       },
       "21": {
-        "annotation": "Bd8#!! completes the double-bishop mate — one bishop seals the net while its partner guards the escape square. Be3, Nf3, f4, and Nh3 all throw the game away and leave White a queen down.",
+        "annotation": "Bd8#!! completes the mate — the dark-squared bishop gives check while the rook on the open file cuts off the king's escape. Be3, Nf3, f4, and Nh3 all throw the game away and leave White a queen down.",
         "alt_annotations": {
           "g5e3": "Retreating wastes the mate in one; White is suddenly losing.",
           "g1f3": "Ignores the mate in one — now Black is winning.",
