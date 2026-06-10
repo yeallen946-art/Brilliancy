@@ -3,11 +3,20 @@ import XCTest
 
 /// Integration tests for the GuessSession state machine over the hardcoded sample game.
 /// Exercises ChessGame (ChessKit) move application as a side effect, so a desync in the
-/// move loop fails here — guess-point gating + autoplay correctness (TECH_SPEC §3.1).
+/// move loop fails here — guess-point gating + stepped autoplay (TECH_SPEC §3.1, UI_FLOW §4).
 final class GuessSessionTests: XCTestCase {
 
     private func makeModel() -> GuessSessionModel {
         GuessSessionModel(game: SampleGames.gameOfTheCentury)
+    }
+
+    /// Synchronously drain autoplay (the view does this on a timer; tests do it inline).
+    private func drainAutoplay(_ model: GuessSessionModel, max: Int = 200) {
+        var safety = 0
+        while model.phase == .autoplaying && safety < max {
+            model.stepAutoplay()
+            safety += 1
+        }
     }
 
     func testStartsInContextAtStartingPosition() {
@@ -17,9 +26,24 @@ final class GuessSessionTests: XCTestCase {
         XCTAssertEqual(model.board.sideToMove, .white)
     }
 
-    func testBeginAutoplaysToFirstGuessPoint() {
+    func testBeginEntersAutoplayWithoutJumpCut() {
         let model = makeModel()
         model.begin()
+        // UI_FLOW §4: never jump-cut — begin() must NOT have applied any moves yet.
+        XCTAssertEqual(model.phase, .autoplaying)
+        XCTAssertEqual(model.index, 0)
+        XCTAssertEqual(model.board.sideToMove, .white)
+
+        // One tick applies exactly one move.
+        model.stepAutoplay()
+        XCTAssertEqual(model.index, 1)
+        XCTAssertEqual(model.board.sideToMove, .black)
+    }
+
+    func testAutoplayStopsAtFirstGuessPoint() {
+        let model = makeModel()
+        model.begin()
+        drainAutoplay(model)
         XCTAssertEqual(model.phase, .awaitingGuess)
         XCTAssertEqual(model.currentMove?.ply, 22)
         XCTAssertEqual(model.currentMove?.san, "Na4")
@@ -30,6 +54,7 @@ final class GuessSessionTests: XCTestCase {
     func testCorrectGuessScoresMatchAndReveals() throws {
         let model = makeModel()
         model.begin()
+        drainAutoplay(model)
         let from = try XCTUnwrap(Sq(name: "b6"))
         let to = try XCTUnwrap(Sq(name: "a4"))
 
@@ -45,6 +70,7 @@ final class GuessSessionTests: XCTestCase {
     func testWrongLegalGuessScoresLowAndDropsRating() throws {
         let model = makeModel()
         model.begin()
+        drainAutoplay(model)
         // a7-a6 is legal here but not Fischer's Na4, and not in candidateEvals -> blunder.
         let from = try XCTUnwrap(Sq(name: "a7"))
         let to = try XCTUnwrap(Sq(name: "a6"))
@@ -56,11 +82,20 @@ final class GuessSessionTests: XCTestCase {
         XCTAssertLessThan(model.rating, model.startRating)
     }
 
-    func testProceedAdvancesToNextGuessPoint() throws {
+    func testProceedReplaysMasterMoveThenAdvances() throws {
         let model = makeModel()
         model.begin()
+        drainAutoplay(model)
         model.submitGuess(from: try XCTUnwrap(Sq(name: "b6")), to: try XCTUnwrap(Sq(name: "a4")))
         model.proceed()
+
+        // proceed() re-enters autoplay; the FIRST tick plays the master move itself.
+        XCTAssertEqual(model.phase, .autoplaying)
+        let indexBefore = model.index
+        model.stepAutoplay()
+        XCTAssertEqual(model.index, indexBefore + 1)
+
+        drainAutoplay(model)
         XCTAssertEqual(model.phase, .awaitingGuess)
         XCTAssertEqual(model.currentMove?.san, "Nxe4") // ply 26, the next guess point
     }
@@ -70,9 +105,11 @@ final class GuessSessionTests: XCTestCase {
         model.begin()
 
         var safety = 0
-        while model.phase != .summary && safety < 100 {
+        while model.phase != .summary && safety < 400 {
             safety += 1
             switch model.phase {
+            case .autoplaying:
+                model.stepAutoplay()
             case .awaitingGuess:
                 guard let move = model.currentMove,
                       let parsed = ChessGame.parse(uci: move.uci) else {

@@ -18,6 +18,7 @@ struct GuessSessionView: View {
                 header
                 switch model.phase {
                 case .context:       contextView
+                case .autoplaying:   autoplayView
                 case .awaitingGuess: guessView
                 case .revealed:      revealView
                 case .summary:       GameSummaryView(model: model, onClose: onClose)
@@ -30,6 +31,18 @@ struct GuessSessionView: View {
         .preferredColorScheme(.dark)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("guessSessionView")
+        // Drive autoplay: one move every ~320ms (UI_FLOW §4: walk in step by step,
+        // never jump-cut). task(id:) cancels/restarts when the phase changes.
+        .task(id: model.phase == .autoplaying) {
+            guard model.phase == .autoplaying else { return }
+            while model.phase == .autoplaying, !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 320_000_000)
+                if Task.isCancelled { return }
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    model.stepAutoplay()
+                }
+            }
+        }
     }
 
     // MARK: - Header
@@ -63,6 +76,15 @@ struct GuessSessionView: View {
                 .font(.system(size: 13)).foregroundStyle(Theme.textSecondary)
                 .lineSpacing(5).multilineTextAlignment(.center)
             Button("Begin") { model.begin() }.buttonStyle(GoldButtonStyle())
+        }
+    }
+
+    private var autoplayView: some View {
+        VStack(spacing: Theme.Space.md) {
+            board(interactive: false)
+            Text("\u{2026}")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(Theme.textSecondary)
         }
     }
 

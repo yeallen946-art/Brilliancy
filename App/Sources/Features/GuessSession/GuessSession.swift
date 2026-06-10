@@ -4,15 +4,18 @@ import Observation
 /// Core guess loop (TECH_SPEC §3.1), shared by DailyChallenge and Training.
 ///
 /// State machine:
-///   context → awaitingGuess → revealed → (awaitingGuess | summary)
+///   context → autoplaying → awaitingGuess → revealed → (autoplaying → awaitingGuess | summary)
 ///
 /// The user plays the hero's color for the whole game. Opening moves and the opponent's
-/// replies / skipped forced moves autoplay; the user only acts at guess points.
+/// replies / skipped forced moves AUTOPLAY ONE MOVE AT A TIME (UI_FLOW §4: never jump-cut
+/// to a position). The model exposes a single `stepAutoplay()` tick; the view drives it on
+/// a timer (~300ms/move), tests drive it synchronously.
 @Observable
 final class GuessSessionModel {
 
     enum Phase: Equatable {
         case context        // SHOW_CONTEXT — intro before the first guess
+        case autoplaying    // AUTOPLAY — stepping moves one by one toward the next guess point
         case awaitingGuess  // AWAIT_GUESS — user to move at a guess point
         case revealed       // SCORE + REVEAL — master move + annotation shown
         case summary        // GAME_SUMMARY
@@ -67,10 +70,34 @@ final class GuessSessionModel {
 
     // MARK: - Transitions
 
-    /// Leave the context screen: autoplay up to the first guess point.
+    /// Leave the context screen: start stepping moves toward the first guess point.
     func begin() {
         guard phase == .context else { return }
-        advanceToNextGuessPoint()
+        phase = .autoplaying
+        settleIfAtGuessPoint()
+    }
+
+    /// Apply exactly one pending move (one autoplay tick). The view calls this on a
+    /// timer; tests call it in a loop. No-op unless autoplaying.
+    func stepAutoplay() {
+        guard phase == .autoplaying else { return }
+        guard game.moves.indices.contains(index) else {
+            phase = .summary
+            return
+        }
+        board.apply(uci: game.moves[index].uci)
+        index += 1
+        settleIfAtGuessPoint()
+    }
+
+    /// Stop autoplay when the next move is a guess point (or the game is over);
+    /// otherwise stay in .autoplaying so the next tick continues.
+    private func settleIfAtGuessPoint() {
+        if !game.moves.indices.contains(index) {
+            phase = .summary
+        } else if game.moves[index].isGuessPoint {
+            phase = .awaitingGuess
+        }
     }
 
     /// Submit the user's guess (already validated legal by the board). Scores + reveals.
@@ -106,30 +133,16 @@ final class GuessSessionModel {
         phase = .revealed
     }
 
-    /// From the reveal screen: play the master move, autoplay to the next guess point
-    /// (or finish). Animation/pacing is a view concern; the model advances atomically.
+    /// From the reveal screen: re-enter autoplay. `index` still points at the revealed
+    /// guess point, so the first tick plays the master's actual move (animated, like
+    /// every other move), then continues to the next guess point or the summary.
     func proceed() {
-        guard phase == .revealed, let point = currentMove else { return }
-        board.apply(uci: point.uci) // play the master's actual move
-        index += 1
+        guard phase == .revealed, currentMove != nil else { return }
         lastEvaluation = nil
         lastGuessUci = nil
-        advanceToNextGuessPoint()
-    }
-
-    // MARK: - Helpers
-
-    /// Apply non-guess moves until the next guess point, or end the game.
-    private func advanceToNextGuessPoint() {
-        while game.moves.indices.contains(index) {
-            if game.moves[index].isGuessPoint {
-                phase = .awaitingGuess
-                return
-            }
-            board.apply(uci: game.moves[index].uci)
-            index += 1
-        }
-        phase = .summary
+        phase = .autoplaying
+        // Note: no settle here — the move at `index` IS a guess point (the revealed
+        // one); the first stepAutoplay() applies it and moves past.
     }
 
     // MARK: - Summary
