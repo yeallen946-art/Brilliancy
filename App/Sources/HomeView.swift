@@ -13,7 +13,9 @@ struct HomeView: View {
     /// as a test fixture for the guess-session state machine.
     private let library: [GameContent] = ContentStore.bundledGames()
 
-    private var featured: GameContent { dailyGame ?? library[0] }
+    /// nil when the DB is missing/unreadable AND the daily hasn't loaded —
+    /// ContentStore degrades to [] by contract, so never index into the library.
+    private var featured: GameContent? { dailyGame ?? library.first }
 
     var body: some View {
         NavigationStack {
@@ -22,9 +24,11 @@ struct HomeView: View {
                 ScrollView {
                     VStack(spacing: Theme.Space.lg) {
                         featuredSection
-                        Button("Play today's game") { playing = featured }
-                            .buttonStyle(GoldButtonStyle())
-                            .accessibilityIdentifier("playTodayButton")
+                        if featured != nil {
+                            Button("Play today's game") { playing = featured }
+                                .buttonStyle(GoldButtonStyle())
+                                .accessibilityIdentifier("playTodayButton")
+                        }
                         librarySection
                         NavigationLink("Board sandbox (debug)") { BoardSandboxView() }
                             .font(.footnote)
@@ -70,13 +74,19 @@ struct HomeView: View {
                 }
             }
             .padding(.top, Theme.Space.lg)
-            Text(featured.title)
-                .font(.system(size: 26, weight: .medium))
-                .foregroundStyle(Theme.textPrimary)
-                .multilineTextAlignment(.center)
-            Text(featured.subtitle)
-                .font(.system(size: 13))
-                .foregroundStyle(Theme.textSecondary)
+            if let featured {
+                Text(featured.title)
+                    .font(.system(size: 26, weight: .medium))
+                    .foregroundStyle(Theme.textPrimary)
+                    .multilineTextAlignment(.center)
+                Text(featured.subtitle)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Theme.textSecondary)
+            } else {
+                Text("No games available — check your connection.")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Theme.textSecondary)
+            }
         }
     }
 
