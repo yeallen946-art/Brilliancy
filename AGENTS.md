@@ -24,7 +24,9 @@ Every new agent session starts from the files, not from chat history:
 1. Read `AGENTS.md` first, then `CLAUDE.md`; `CLAUDE.md` hard rules win if there is any conflict.
 2. For product decisions, read `PRD.md`; for implementation decisions, read `TECH_SPEC.md`; for milestone scope and acceptance, read `ROADMAP.md`.
 3. Run `git status --short --branch`, then `git pull --ff-only` before making changes.
-4. Commit only source/config/doc changes that belong to the task. Generated build products, DerivedData, local tool downloads, and `.xcodeproj` stay out of git.
+4. Run `gh issue list --state open` and read anything labeled for your side (see
+   "Cross-agent handoffs" below). If `gh` isn't authed on this machine, ask Jerry.
+5. Commit only source/config/doc changes that belong to the task. Generated build products, DerivedData, local tool downloads, and `.xcodeproj` stay out of git.
 
 ## How agents stay in sync (normal git hygiene, nothing exotic)
 
@@ -35,6 +37,29 @@ There is no shared memory between agents. The only shared state is what's commit
 3. **`git pull` before you start, push when a unit of work is done.** Small, focused commits. Conventional prefixes (`feat:`, `fix:`, `pipeline:`, `content:`, `build:` for build-only fixes by the macOS agent).
 4. **Don't fight the other agent's changes.** If you pull and find the build was fixed in a way you didn't expect, understand it before changing it back. If it violates a hard rule or the spec, flag it in a commit message / note rather than silently reverting.
 5. **No hand-editing the Xcode project.** The project is generated from `project.yml` by **XcodeGen** (TECH_SPEC §2.1); `.xcodeproj` is git-ignored and never committed. To add a source file, just create the `.swift` in the right folder — XcodeGen globs it in. Structural changes (targets, build settings, capabilities) go in `project.yml`, which any agent can edit from any machine. After pulling on macOS, run `xcodegen generate` before building.
+
+## Cross-agent handoffs: GitHub Issues (not files in the repo)
+
+Handoffs between agents go through **GitHub Issues** (`gh` CLI), NOT through a handoff
+file in the working tree — repo files get concurrent-write conflicts (we've had real
+truncation/lock incidents); issues are server-side, atomic, and stateful.
+
+**Protocol:**
+
+1. **Startup (both agents):** after `git pull`, run `gh issue list --state open` and read
+   anything labeled for your side before starting work.
+2. **Labels route work:** `needs-mac-verify` = Windows wrote it blind, macOS must
+   build/test/eyeball it. `needs-windows-fix` = macOS found a logic/feature problem that
+   Windows owns. `blocked-on-human` = needs Jerry (keys, accounts, taste calls).
+3. **Open an issue when you hand off** — one issue per verifiable unit, with: the commit
+   hash, what to check, and the expected result. Don't batch unrelated items.
+4. **Close the loop in the issue, not in a new file:** the verifying agent comments the
+   actual result (pass/fail + errors verbatim) and closes the issue if green, or relabels
+   it back (`needs-windows-fix`) if not. Reference commits with the hash so they link.
+5. **Commit messages still carry the "why"** (point 1 above stands); issues carry the
+   *work routing*. An issue is not a substitute for writing intent down in the code/commit.
+6. One-time setup per machine: `gh` installed + `gh auth login` (Jerry does auth; agents
+   never store their own credentials).
 
 ## Cross-platform gotchas (set up once)
 
