@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
 
 import store
 from build import build_sqlite, daily_date_or_none, unshippable_reasons, write_daily
@@ -54,6 +55,14 @@ def main() -> int:
 
     build_sqlite(games, args.db)
     print(f"Built {args.db} from {len(games)} game(s).")
+
+    # Copy into the app bundle location (App/Resources/) — the app reads this via
+    # ContentStore/GRDB (TECH_SPEC §3). Committed as a built artifact so the Mac can
+    # build the app without running the pipeline.
+    app_db = os.path.join(store.REPO_ROOT, "App", "Resources", "content.sqlite")
+    os.makedirs(os.path.dirname(app_db), exist_ok=True)
+    shutil.copyfile(args.db, app_db)
+    print(f"Copied to {app_db} (bundle it by rebuilding the app).")
 
     # Daily archive: clear stale files first, then emit each game keyed by a full numeric
     # date (skip partial dates like "1910.??.??" — many classic PGNs lack a month/day).

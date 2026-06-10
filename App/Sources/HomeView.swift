@@ -5,12 +5,18 @@ import SwiftUI
 struct HomeView: View {
     @State private var playing: GameContent?
 
-    private let featured = SampleGames.operaGame
-    private let library: [GameContent] = [
-        SampleGames.operaGame,
-        SampleGames.reti,
-        SampleGames.gameOfTheCentury,
-    ]
+    /// Pipeline content from the bundled content.sqlite; falls back to the generated
+    /// literals if the DB is missing/unreadable. The M1 Byrne–Fischer sample (not in
+    /// the DB — placeholder evals) is always appended last.
+    private let library: [GameContent] = {
+        let bundled = ContentStore.bundledGames()
+        let fromPipeline = bundled.isEmpty
+            ? [SampleGames.operaGame, SampleGames.reti]
+            : bundled
+        return fromPipeline + [SampleGames.gameOfTheCentury]
+    }()
+
+    private var featured: GameContent { library[0] }
 
     var body: some View {
         NavigationStack {
