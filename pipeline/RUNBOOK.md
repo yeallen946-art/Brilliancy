@@ -44,6 +44,12 @@ python 6_review.py --reject  <id>              # for ones that need rework
 # 6. Build the shippable DB from approved + selected games:
 python 7_build.py
 #    -> content/content.sqlite (+ content/daily/*.json)
+
+# 7. Publish daily challenges to the CDN (GitHub Pages repo, sibling checkout
+#    ../brilliancy-content). Dates = CHALLENGE dates, rotating the approved pool:
+python tools/publish_daily.py --rotate 2026-06-24 30
+cd ../../brilliancy-content && git add -A && git commit -m "content: daily schedule" && git push
+#    Live at https://yeallen946-art.github.io/brilliancy-content/daily/<date>.json
 ```
 
 `run_pipeline.py` does steps 1, 3, 4, 5, 6 in sequence (respecting `selected.txt`); steps 2
