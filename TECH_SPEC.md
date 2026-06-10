@@ -191,19 +191,26 @@ pipeline/
                   #     15-30 points/game; difficulty + tag assignment
                   #   depth ~22 or time-budget/pos; multipv=all is cheap
                   #   at moderate depth and is a one-time offline cost
-  4_annotate.py   # Claude API: generate narrative_intro, annotation (master
-                  #   move), and alt_annotations for INTERESTING moves only
-                  #   (engine top-N + common wrong guesses). Long-tail moves
-                  #   get no prose — the app templates them from legal_evals.
-                  #   Prompt receives engine lines and MUST ground every claim
-                  #   in them. Batch API for cost. Honesty rule: when the
-                  #   master move is not engine-best (e.g. a brilliancy), the
-                  #   annotation states the engine's view, not a fake claim
-                  #   that the master move is objectively best.
-  5_validate.py   # automated checks: every move mentioned in annotation
-                  #   is legal and appears in engine top5/PV; eval
-                  #   adjectives match numbers ("winning" needs >+2.0);
-                  #   length limits; reading level
+  facts.py        # (lib, see §5.1) deterministic chess-fact extractor:
+                  #   mating pieces (checkers + supporters at mate), material
+                  #   deltas along refutation PV, tactical motifs, eval/PV.
+                  #   The single source of truth — feeds 4_annotate AND 5_validate.
+  4_annotate.py   # Claude API: render facts.py output into prose. The model
+                  #   NARRATES given facts, never asserts its own chess claims.
+                  #   Move annotations get FEN + engine lines + computed facts
+                  #   ONLY — game identity is stripped (prevents mis-remembered
+                  #   famous-game errors, see §5.1). narrative_intro (history)
+                  #   is a separate field allowed game knowledge, checked apart.
+                  #   alt_annotations for INTERESTING moves only (engine top-N +
+                  #   common wrong guesses); long-tail templated at runtime.
+                  #   Honesty rule: master move not engine-best (brilliancy) →
+                  #   state the engine's view, don't fake "objectively best".
+  5_validate.py   # board-aware safety net (NOT string matching), checks vs
+                  #   facts.py: claimed mating pieces == actual checkers/
+                  #   supporters; every material claim == a capture in the
+                  #   refutation PV; eval adjectives match numbers; moves legal
+                  #   & in engine output; length/reading level. Reject → retry
+                  #   with the specific contradiction.
   6_review.py     # emits review HTML (board + annotation side by side)
                   #   for human review; tracks approved/rejected per game
   7_build.py      # approved games → content.sqlite + daily JSON files
@@ -212,6 +219,22 @@ pipeline/
 **Annotation grounding contract (critical, see PRD §6):** the LLM prompt includes engine PV and the relevant lines from `legal_evals` for the position; the system prompt forbids chess claims not derivable from the provided lines; `5_validate.py` rejects annotations referencing moves outside engine output, AND rejects any claim that a move is "best"/"winning" that contradicts `legal_evals` (this is what enforces the §3.2 honesty rule about master-suboptimal brilliancies). Rejected items go back to step 4 with the validation error in the retry prompt.
 
 Cost note: prose is generated only for the master move + interesting alternatives (engine top-N + common wrong guesses), NOT for every legal move — long-tail moves are templated at runtime. So ~50 games × ~25 points × (1 + a few) prose snippets ≈ manageable in Claude Max / Batch API budget; regenerate only failed items. `legal_evals` (all moves) is engine-only, no LLM cost.
+
+### 5.1 Annotation architecture: compute-facts-then-narrate (not generate-then-block)
+
+The naive design — "LLM writes chess claims from its own knowledge, validator catches errors, reject/retry" — is a losing game of whack-a-mole: the validator always lags the new errors an LLM can invent. (Real example caught in M2 review: the Réti–Tartakower annotation claimed a "double-bishop mate" / "two bishops hunt the king" — it's actually a **bishop-and-rook** mate. The engine grounding can't catch this because the move is legal; only the *piece-level claim* is wrong.) **Validation is the safety net, not the primary mechanism.** The primary mechanism is to invert the flow:
+
+**Compute the verifiable facts deterministically, then let the LLM only phrase them.** The LLM must never *assert* a chess fact it could get wrong; it only renders given facts into natural, coach-toned prose plus interpretive "why it matters" color.
+
+- **`facts.py` (new module) — the single source of truth, used twice.** A deterministic chess-fact extractor (python-chess + the engine output) computes, per guess point: the engine PV / eval / eval-delta / best move; **the mating pattern** (at a mate, exactly which pieces give check and which support the net — computed from the board, never recalled); **material balance and any change along the refutation PV** (so "wins a pawn" / "drops a piece" is a computed fact, not an LLM guess); and **tactical motifs** (fork / pin / discovered check / skewer — detected, incrementally). These facts are (a) fed INTO `4_annotate` as the only allowed source material, and (b) the ground truth `5_validate` checks against. One extractor, two consumers — never a prompt that asserts one thing and a string-matcher that checks another.
+
+- **Strip game identity from the move-annotation prompt.** The "two bishops" error came from the LLM pattern-matching a *mis-remembered* famous game. `4_annotate` move annotations receive only FEN + engine lines + computed facts — **not** "this is Réti–Tartakower" — so the model describes *this board*, not its memory of the game. (The historical `narrative_intro` is a separate field that may use game knowledge but is fact-checked separately.)
+
+- **Tier the prose, not just the moves.** Load-bearing claims (mating pieces, eval, PV, motif, material) are computed and locked. Interpretive judgment ("White's pieces tangle, no clean way to defend both") stays LLM-authored but must be *consistent with* the computed eval (engine says +winning → "tangle" is allowed; engine says equal → reject). This preserves the coach-explains-why magic (the product's moat) while removing the failure surface. Don't over-template into robotic prose.
+
+- **`5_validate.py` upgrades (safety net, board-aware — not string matching):** given board + annotation, verify structured questions against `facts.py`: do claimed mating pieces match the actual checkers/supporters at mate? does every material claim ("pawn", "piece", "exchange") correspond to a capture in the refutation PV? do eval adjectives match the number? Reject → retry with the specific contradiction in the prompt.
+
+- **Human review stays the gate for the curated MVP.** For ~50 games, the 1700 reviewer (Jerry's son) catches exactly the interpretive/semantic errors no automated check will (he found the "two bishops" error the engine couldn't). Automation above is what makes annotation *scale* beyond what a human can review; it does not replace human review of the launch set.
 
 ## 6. Monetization Implementation
 
