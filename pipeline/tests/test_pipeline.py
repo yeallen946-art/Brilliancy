@@ -94,6 +94,15 @@ def test_motif_grading():
     assert analysis.motif(cp=None, mate=2, best_cp=0) == "best"
 
 
+def test_best_entry_mate_beats_best_cp():
+    # Bug B: a mating move must not be shadowed by the best non-mate cp.
+    le = {"a": {"cp": -571, "mate": None}, "b": {"cp": None, "mate": 1}}
+    assert analysis.best_entry(le)["mate"] == 1
+    le2 = {"a": {"cp": 300, "mate": None}, "b": {"cp": 50, "mate": None}}
+    assert analysis.best_entry(le2)["cp"] == 300
+    assert analysis.best_entry({}) is None
+
+
 # ------------------------------------------------------------------- validate
 
 def _guess_move(annotation, legal_evals, master_uci="e2e4"):
@@ -131,6 +140,48 @@ def test_validate_flags_false_winning_claim():
     move = _guess_move("White is completely winning here.", {"e2e4": {"cp": 30}})
     codes = {e.code for e in validate_move("g", move)}
     assert "eval_adjective_mismatch" in codes
+
+
+def test_line_has_capture():
+    from validate import line_has_capture
+    # e4 e5 Nf3 — no capture
+    assert line_has_capture(START_FEN, "e2e4", ["e7e5", "g1f3"]) is False
+    # e4 d5 exd5 — capture
+    assert line_has_capture(START_FEN, "e2e4", ["d7d5", "e4d5"]) is True
+
+
+def test_validate_alt_material_claim_must_be_backed():
+    from validate import validate_move
+    move = MoveRecord(
+        ply=20, san="e4", uci="e2e4", fen_before=START_FEN, mover="white",
+        is_guess_point=True, annotation="e4 grabs the center.",
+        legal_evals={"e2e4": {"cp": 30},
+                     "d2d4": {"cp": 10, "refutation_pv": ["g8f6", "b1c3"]}},  # no capture
+        alt_annotations={"d2d4": "This drops a piece."},
+    )
+    codes = {e.code for e in validate_move("g", move)}
+    assert "unsupported_material_claim" in codes
+
+
+def test_validate_alt_illegal_move_mention():
+    from validate import validate_move
+    move = MoveRecord(
+        ply=20, san="e4", uci="e2e4", fen_before=START_FEN, mover="white",
+        is_guess_point=True, annotation="e4 is central.",
+        legal_evals={"e2e4": {"cp": 30}, "d2d4": {"cp": 10}},
+        alt_annotations={"d2d4": "Allows Qh4 immediately."},  # Qh4 illegal at start
+    )
+    codes = {e.code for e in validate_move("g", move)}
+    assert "illegal_move_mentioned" in codes
+
+
+def test_unshippable_reasons():
+    g = _approved_game()
+    assert build.unshippable_reasons(g) == []
+    bad = _approved_game(); bad.moves[0].annotation = None
+    assert any("unannotated" in r for r in build.unshippable_reasons(bad))
+    empty = _approved_game(); empty.moves[0].is_guess_point = False
+    assert any("0 guess points" in r for r in build.unshippable_reasons(empty))
 
 
 # ---------------------------------------------------------------------- build

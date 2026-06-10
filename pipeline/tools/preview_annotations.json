@@ -6,17 +6,17 @@
         "annotation": "Qd8+!! hurls the queen onto an empty square to tear open the king. Black is forced to take, and the two bishops then hunt the king down to mate. The quiet Re1 keeps an edge but misses the kill; Nf3, Bb4, and Qe2 all let Black escape with the extra piece.",
         "alt_annotations": {
           "d1e1": "Sensible and still a touch better for White, but it misses the forced mate that starts with Qd8+.",
-          "g1f3": "Too slow: Black's queen jumps to d5 and snaps off a pawn, taking over.",
-          "d2b4": "This simply drops material — Black is better afterwards.",
-          "d3e2": "Retreating the queen hands Black the initiative and a pawn."
+          "g1f3": "Too slow: Black's queen escapes with tempo and grabs a pawn, taking over.",
+          "d2b4": "Loose and passive — Black calmly develops and stays firmly on top.",
+          "d3e2": "Retreating the queen concedes the initiative; Black is comfortably better."
         }
       },
       "19": {
         "annotation": "Bg5+!! is the only move that justifies the queen sacrifice, driving the king into the corner where the bishop mates next. Every alternative leaves White a whole queen down for nothing: Nf3, Ba5+, Bf4+, and Bc3+ all simply lose.",
         "alt_annotations": {
           "g1f3": "Develops, but White is a queen down with no follow-up — Black is winning.",
-          "d2a5": "A check that leads nowhere; the king steps aside and the sacrifice has failed.",
-          "d2f4": "Another check, but it doesn't trap the king, and White stays a queen down.",
+          "d2a5": "A check, but unlike Bg5+ it doesn't lead to mate — the king escapes and White stays a queen down.",
+          "d2f4": "Another check, yet it doesn't trap the king, and White is still a queen down.",
           "d2c3": "Same problem: a check with no mate behind it, and White is lost."
         }
       },
@@ -37,7 +37,7 @@
       "17": {
         "annotation": "Bg5 develops the last minor piece and pins the knight, keeping Black's king stuck in the center. White is clearly better. Be3 is playable but passive; a4, O-O, and g4 are all slower and let Black untangle.",
         "alt_annotations": {
-          "c1e3": "Solid but passive — it lets Black start unraveling with ...b5.",
+          "c1e3": "Solid but passive — it lets Black begin to untangle.",
           "a2a4": "Useful one day, but too slow while Black's king sits in the center.",
           "e1g1": "Safe, yet castling here eases the pressure; the initiative matters more.",
           "g2g4": "Loosening and slow — Black gets time to consolidate."
@@ -47,7 +47,7 @@
         "annotation": "Nxb5!! rips open the c-file: after Black recaptures, White's pieces pour toward the stranded king. The timid Bxf6, Bxb5, Be2, and Bd5 all let Black off the hook and squander most of the advantage.",
         "alt_annotations": {
           "g5f6": "Trades off an attacker; the pressure fizzles and White is only slightly better.",
-          "c4b5": "Recaptures the pawn but releases the bind — most of the edge is gone.",
+          "c4b5": "Takes the pawn back but releases the bind — most of the edge is gone.",
           "c4e2": "Passive retreat; Black gets time to develop and the edge slips.",
           "c4d5": "Tempting, but after the recapture the attack loses steam."
         }
@@ -56,17 +56,17 @@
         "annotation": "O-O-O drops the rook onto the open d-file, where it bears down on Black's pinned knight and queen — castling as a killing blow. Bxf6 lets a defender off the hook; Rd1, a3, and O-O are all much weaker.",
         "alt_annotations": {
           "g5f6": "Releases the pin too soon; White stays better but the bind loosens.",
-          "a1d1": "The other rook to d1 leaves the king in the center — far less forcing.",
+          "a1d1": "Bringing the other rook up leaves the king in the center — far less forcing.",
           "a2a3": "A waiting move that wastes the moment and lets Black breathe.",
-          "e1g1": "Castling the wrong way misplaces the rook and lets ...Bb4 in."
+          "e1g1": "Castling the wrong way misplaces the rook and lets Black's bishop into the attack."
         }
       },
       "25": {
         "annotation": "Rxd7! tears down Black's last defender — after the recapture, the second rook swings in and the d-file collapses. Rd3, Ba4, Rd5, and Kb1 keep an edge but let Black survive much longer.",
         "alt_annotations": {
-          "d1d3": "Lifts the rook but gives Black time for ...a6 and ...e6.",
-          "b5a4": "Keeps the bishop, yet it's slow; Black plays ...e6 and holds on.",
-          "d1d5": "Active, but after ...h6 the bishop must move and the punch is gone.",
+          "d1d3": "Lifts the rook but gives Black time to consolidate.",
+          "b5a4": "Keeps the bishop, yet it's slow; Black defends and holds on.",
+          "d1d5": "Active, but Black can kick the rook and the punch is gone.",
           "c1b1": "Tidying the king is too slow when a forcing finish is available."
         }
       },
@@ -75,7 +75,7 @@
         "alt_annotations": {
           "g5f6": "Trading the bishop eases Black's defense and softens the attack.",
           "c2c3": "A quiet pawn move wastes the tempo Black desperately needs.",
-          "b5a4": "Retreating the bishop lets Black reorganize with ...Bd6.",
+          "b5a4": "Retreating the bishop lets Black reorganize.",
           "f2f4": "Premature; it opens lines for Black's queen instead."
         }
       },
@@ -83,17 +83,17 @@
         "annotation": "Bxd7+ clears the way with check, forcing Black's reply so the rook can crash through next. Bxf6 is also strong, but Qc3, Rxd7, and Qxe6+ let the win slide toward merely better.",
         "alt_annotations": {
           "g5f6": "Also crushing — but Bxd7+ is cleaner and more forcing.",
-          "b3c3": "Strong, yet it lets Black wriggle with ...Bd6 and defend.",
-          "d1d7": "Right idea, wrong order — ...Qxb3 first costs White the queen.",
-          "b3e6": "Grabs the queen, but after ...fxe6 only a small edge remains."
+          "b3c3": "Strong, yet it lets Black wriggle free and defend.",
+          "d1d7": "Right idea, wrong order — Black grabs the White queen first.",
+          "b3e6": "Takes the queen, but after the recapture only a small edge remains."
         }
       },
       "31": {
         "annotation": "Qb8+!! is the famous queen sacrifice — the knight is forced to take, abandoning the d-file, and the rook mates on the back rank. The greedy Qb7 and Qc3 keep a big edge but miss the forced mate; Qb5 and Rd5 are much worse.",
         "alt_annotations": {
           "b3b7": "Keeps a winning attack, but lets the king flee and misses mate in two.",
-          "b3c3": "Strong, yet it allows ...f6 and a longer fight instead of the mate.",
-          "b3b5": "Drops most of the advantage — Black defends with ...Be7.",
+          "b3c3": "Strong, yet it allows a longer fight instead of the immediate mate.",
+          "b3b5": "Lets most of the advantage slip — Black gets to defend.",
           "d1d5": "Misplaces the rook and lets the win slip away."
         }
       },

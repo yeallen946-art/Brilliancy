@@ -30,7 +30,11 @@ HARD RULES (a validator rejects violations):
 - Be honest about the engine's view. If the master's move is NOT the engine's top choice,
   say so plainly. Never call a move "best", "winning", or "crushing" unless the evals
   support it.
-- Refer to moves in standard algebraic notation exactly as written in the data (e.g. "Be6").
+- Only name a move in algebraic notation if it is a legal move for the side to move in
+  THIS position (i.e. it appears in the candidate list). Describe the OPPONENT's replies
+  in words, never in notation.
+- Do NOT claim a move "wins", "loses", "drops", or "hangs" material unless that move's
+  engine reply line actually contains a capture. Material words must be backed by a capture.
 
 STYLE:
 - Audience: 800-2000 rated improvers. Prefer plain plan-language over deep variations.
@@ -144,8 +148,10 @@ def build_move_prompt(game: GameRecord, move: MoveRecord) -> str:
         "",
         f"Write `annotation`: why {master_san} works — or, if the engine prefers another "
         f"move, what {master_san} is going for, with the engine's honest view.",
-        f"Write `alt_annotations` for these moves only: {alt_sans or '(none)'} — "
-        "one short note each on why a guesser might try it and why it is worse.",
+        f"Write `alt_annotations` for these moves only: {alt_sans or '(none)'}. For each, "
+        "base the note on THAT move's engine reply line above; say why a guesser might try "
+        "it and why it is worse. Describe the opponent's replies in words, not notation, and "
+        "claim material loss only if that reply line shows a capture.",
     ]
     return "\n".join(lines)
 

@@ -12,7 +12,7 @@ import argparse
 import os
 
 import store
-from build import build_sqlite, daily_date_or_none, write_daily
+from build import build_sqlite, daily_date_or_none, unshippable_reasons, write_daily
 from validate import validate_game
 
 
@@ -39,7 +39,14 @@ def main() -> int:
         print("No games to build (need approved + selected games, or pass --all).")
         return 1
 
-    # Safety gate: validation must pass before shipping content (hard rule).
+    # Safety gate 1: no empty / partly-annotated games may ship (reviewer guard, A/D).
+    blockers = [(g.id, r) for g in games for r in [unshippable_reasons(g)] if r]
+    if blockers:
+        for gid, reasons in blockers:
+            print(f"Refusing to build {gid}: {'; '.join(reasons)}")
+        return 1
+
+    # Safety gate 2: annotation validation must pass before shipping (hard rule #1).
     errors = [e for g in games for e in validate_game(g)]
     if errors:
         print(f"Refusing to build: {len(errors)} validation error(s). Run 5_validate.py.")
@@ -48,8 +55,12 @@ def main() -> int:
     build_sqlite(games, args.db)
     print(f"Built {args.db} from {len(games)} game(s).")
 
-    # Daily archive: emit each game keyed by a full numeric date (skip partial dates
-    # like "1910.??.??" — many classic PGNs lack a month/day).
+    # Daily archive: clear stale files first, then emit each game keyed by a full numeric
+    # date (skip partial dates like "1910.??.??" — many classic PGNs lack a month/day).
+    if os.path.isdir(args.daily_dir):
+        for name in os.listdir(args.daily_dir):
+            if name.endswith(".json"):
+                os.remove(os.path.join(args.daily_dir, name))
     written = 0
     for g in games:
         date = daily_date_or_none(g.date)

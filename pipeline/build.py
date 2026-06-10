@@ -71,6 +71,21 @@ def build_sqlite(games: list[GameRecord], db_path: str, packs: list[dict] | None
         conn.close()
 
 
+def unshippable_reasons(game: GameRecord) -> list[str]:
+    """Why a game must NOT ship (TECH_SPEC §9 / reviewer guard): no empty or partly-
+    annotated games in content.sqlite or daily JSON."""
+    reasons: list[str] = []
+    guess_points = [m for m in game.moves if m.is_guess_point]
+    if not guess_points:
+        reasons.append("0 guess points (not analyzed)")
+    unannotated = [m.ply for m in guess_points if not m.annotation]
+    if unannotated:
+        reasons.append(f"unannotated guess points at plies {unannotated}")
+    if not game.title:
+        reasons.append("missing title")
+    return reasons
+
+
 def daily_date_or_none(pgn_date: str | None) -> str | None:
     """Convert a PGN date ('1956.10.17') to 'YYYY-MM-DD', or None for partial dates
     ('1910.??.??') — many classic PGNs lack a real month/day."""

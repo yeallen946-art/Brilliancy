@@ -22,7 +22,7 @@ import chess
 
 import guesspoints
 import store
-from analysis import DEFAULT_DEPTH, analyze_legal_evals, analyze_position
+from analysis import DEFAULT_DEPTH, analyze_legal_evals, analyze_position, best_entry
 
 
 def _format(move_evals, fen: str) -> str:
@@ -54,7 +54,11 @@ def analyze_game(args) -> int:
             continue
         evals = analyze_legal_evals(move.fen_before, depth=args.depth, engine_path=args.engine)
         move.legal_evals = evals
-        move.eval_cp = max((e["cp"] for e in evals.values() if e["cp"] is not None), default=None)
+        # Summary eval comes from the BEST legal move (bug B): a mate must not be
+        # shadowed by the best non-mate cp.
+        be = best_entry(evals)
+        move.eval_cp = be["cp"] if be else None
+        move.eval_mate = be["mate"] if be else None
         move.difficulty = guesspoints.difficulty_from_evals(evals)
         move.tags = guesspoints.tag_for_move(move)
         marked += 1

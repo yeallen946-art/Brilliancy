@@ -23,6 +23,15 @@ MAX_SENTENCE_WORDS = 35
 WINNING_WORDS = ("winning", "crushing", "decisive", "completely won", "totally winning")
 EQUAL_WORDS = ("equal", "balanced", "level", "roughly equal")
 BEST_WORDS = ("the best move", "best move", "only move", "objectively best")
+# Material claims must be backed by a capture in the engine line (TECH_SPEC §5 honesty rule).
+# Phrases, not bare "drops" (avoids false positives like "drops the advantage").
+MATERIAL_WORDS = (
+    "drops material", "drops a piece", "drops a pawn", "drops the exchange",
+    "loses material", "loses a piece", "loses a pawn", "loses the exchange",
+    "wins a pawn", "win a pawn", "wins material", "win material", "wins a piece",
+    "wins the exchange", "grabs a pawn", "snaps off a pawn", "and a pawn",
+    "extra pawn", "up a pawn", "hangs a",
+)
 
 WINNING_THRESHOLD_CP = 200   # "winning" needs >= +2.0 for the mover
 EQUAL_BAND_CP = 50           # "equal" needs |eval| <= 0.5
@@ -70,6 +79,44 @@ def _contains_any(text: str, phrases: tuple[str, ...]) -> bool:
     return any(p in low for p in phrases)
 
 
+def _check_mentioned_moves(text: str, fen_before: str, legal_ucis: set,
+                           game_id: str, ply: int) -> list[ValidationError]:
+    """Every move named in prose must be legal at this position and in engine output."""
+    errors: list[ValidationError] = []
+    board = chess.Board(fen_before)
+    for token in extract_san_tokens(text):
+        try:
+            parsed = board.parse_san(token)
+        except ValueError:
+            errors.append(ValidationError(
+                game_id, ply, "illegal_move_mentioned",
+                f"references illegal move '{token}'"))
+            continue
+        if legal_ucis and parsed.uci() not in legal_ucis:
+            errors.append(ValidationError(
+                game_id, ply, "move_outside_engine_output",
+                f"move '{token}' is not in legal_evals"))
+    return errors
+
+
+def line_has_capture(fen_before: str, move_uci: str, refutation_pv: list) -> bool:
+    """True if the engine line after `move_uci` contains a capture (backs material claims)."""
+    board = chess.Board(fen_before)
+    try:
+        board.push(chess.Move.from_uci(move_uci))
+    except (ValueError, AssertionError):
+        return False
+    for uci in refutation_pv or []:
+        try:
+            mv = chess.Move.from_uci(uci)
+        except ValueError:
+            break
+        if board.is_capture(mv):
+            return True
+        board.push(mv)
+    return False
+
+
 def validate_move(game_id: str, move: MoveRecord) -> list[ValidationError]:
     errors: list[ValidationError] = []
     text = move.annotation
@@ -90,22 +137,8 @@ def validate_move(game_id: str, move: MoveRecord) -> list[ValidationError]:
         ))
 
     # 2) every mentioned move is legal AND in engine output (legal_evals)
-    board = chess.Board(move.fen_before)
     legal_ucis = set(move.legal_evals.keys())
-    for token in extract_san_tokens(text):
-        try:
-            parsed = board.parse_san(token)
-        except ValueError:
-            errors.append(ValidationError(
-                game_id, move.ply, "illegal_move_mentioned",
-                f"annotation references illegal move '{token}'",
-            ))
-            continue
-        if legal_ucis and parsed.uci() not in legal_ucis:
-            errors.append(ValidationError(
-                game_id, move.ply, "move_outside_engine_output",
-                f"move '{token}' is not in legal_evals",
-            ))
+    errors.extend(_check_mentioned_moves(text, move.fen_before, legal_ucis, game_id, move.ply))
 
     # 3) eval adjectives must match numbers; honesty rule for "best/winning"
     cp = _master_cp(move)
@@ -129,6 +162,20 @@ def validate_move(game_id: str, move: MoveRecord) -> list[ValidationError]:
                 game_id, move.ply, "false_best_claim",
                 f"claims 'best' but master move is {best - cp}cp below the engine best",
             ))
+
+    # 4) alternative-move notes: same move-mention rule, plus material claims must be
+    #    backed by a capture in THAT move's refutation line (TECH_SPEC §5 honesty rule).
+    for alt_uci, prose in (move.alt_annotations or {}).items():
+        if not prose:
+            continue
+        errors.extend(_check_mentioned_moves(prose, move.fen_before, legal_ucis, game_id, move.ply))
+        if _contains_any(prose, MATERIAL_WORDS):
+            refutation = (move.legal_evals.get(alt_uci) or {}).get("refutation_pv", [])
+            if not line_has_capture(move.fen_before, alt_uci, refutation):
+                errors.append(ValidationError(
+                    game_id, move.ply, "unsupported_material_claim",
+                    f"alt note for '{alt_uci}' claims material change, but its line has no capture",
+                ))
 
     return errors
 

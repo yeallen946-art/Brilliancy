@@ -108,6 +108,19 @@ def analyze_position(
     return sort_best_first(results, n=multipv)
 
 
+def rank_score(entry: dict) -> float:
+    """Mover-POV ranking key: mate-for-mover > any cp > being-mated; faster is better."""
+    mate = entry.get("mate")
+    if mate is not None:
+        return (1e9 - mate) if mate > 0 else (-1e9 - mate)
+    return float(entry.get("cp") or 0)
+
+
+def best_entry(legal_evals: dict) -> dict | None:
+    """The best legal move's eval entry (drives the summary eval_cp/eval_mate, bug B fix)."""
+    return max(legal_evals.values(), key=rank_score) if legal_evals else None
+
+
 def motif(cp: int | None, mate: int | None, best_cp: int | None) -> str:
     """Graded quality tag for a candidate move (fills legal_evals.motif, TECH_SPEC §4).
 
