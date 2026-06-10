@@ -14,6 +14,7 @@ from dataclasses import dataclass
 
 import chess
 
+import facts
 from store import GameRecord, MoveRecord
 
 MAX_ANNOTATION_CHARS = 400
@@ -40,6 +41,16 @@ EQUAL_BAND_CP = 50           # "equal" needs |eval| <= 0.5
 # English words don't match. May over/under-match in rare prose; good enough + tested.
 SAN_TOKEN_RE = re.compile(
     r"\b(O-O-O|O-O|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?[+#]?)\b"
+)
+
+# Mate-claim patterns checked against facts.mate_pattern (the "two bishops" class).
+# "double-bishop mate", "two rooks", "both knights", "pair of bishops":
+DOUBLE_KIND_RE = re.compile(
+    r"\b(?:two|both|double|pair of)[\s-]+(pawns?|knights?|bishops?|rooks?|queens?)\b", re.I
+)
+# "rook mate", "queen mates", "bishop-mate": the credited kind must participate.
+MATE_CREDIT_RE = re.compile(
+    r"\b(pawn|knight|bishop|rook|queen)[\s-]+mates?\b", re.I
 )
 
 
@@ -100,21 +111,33 @@ def _check_mentioned_moves(text: str, fen_before: str, legal_ucis: set,
 
 
 def line_has_capture(fen_before: str, move_uci: str, refutation_pv: list) -> bool:
-    """True if the engine line after `move_uci` contains a capture (backs material claims)."""
-    board = chess.Board(fen_before)
-    try:
-        board.push(chess.Move.from_uci(move_uci))
-    except (ValueError, AssertionError):
-        return False
-    for uci in refutation_pv or []:
-        try:
-            mv = chess.Move.from_uci(uci)
-        except ValueError:
-            break
-        if board.is_capture(mv):
-            return True
-        board.push(mv)
-    return False
+    """True if move + line contains a capture (backs material claims). Delegates to
+    facts.line_material — one extractor, two consumers (TECH_SPEC §5.1)."""
+    return bool(facts.line_material(fen_before, move_uci, refutation_pv).captures)
+
+
+def check_mate_claims(text: str, pattern: facts.MatePattern,
+                      game_id: str, ply: int) -> list[ValidationError]:
+    """Verify piece-credit claims about a mate against the computed mate pattern
+    (the 'double-bishop' class of error). Board-aware, not vibes."""
+    errors: list[ValidationError] = []
+    if not pattern.is_mate or not text:
+        return errors
+    for m in DOUBLE_KIND_RE.finditer(text):
+        kind = m.group(1).rstrip("s").lower()
+        if pattern.kind_count(kind) < 2:
+            errors.append(ValidationError(
+                game_id, ply, "wrong_mating_pieces",
+                f"claims '{m.group(0)}' but only {pattern.kind_count(kind)} {kind}(s) "
+                f"participate in the mate ({pattern.checkers + pattern.supporters})"))
+    for m in MATE_CREDIT_RE.finditer(text):
+        kind = m.group(1).lower()
+        if kind not in pattern.participant_kinds:
+            errors.append(ValidationError(
+                game_id, ply, "wrong_mating_pieces",
+                f"credits the {kind} with the mate, but participants are "
+                f"{pattern.checkers + pattern.supporters}"))
+    return errors
 
 
 def validate_move(game_id: str, move: MoveRecord) -> list[ValidationError]:
@@ -163,7 +186,11 @@ def validate_move(game_id: str, move: MoveRecord) -> list[ValidationError]:
                 f"claims 'best' but master move is {best - cp}cp below the engine best",
             ))
 
-    # 4) alternative-move notes: same move-mention rule, plus material claims must be
+    # 4) mate piece-credit claims, checked against the computed mate pattern (§5.1).
+    pattern = facts.mate_pattern(move.fen_before, move.uci)
+    errors.extend(check_mate_claims(text, pattern, game_id, move.ply))
+
+    # 5) alternative-move notes: same move-mention rule, plus material claims must be
     #    backed by a capture in THAT move's refutation line (TECH_SPEC §5 honesty rule).
     for alt_uci, prose in (move.alt_annotations or {}).items():
         if not prose:
@@ -182,7 +209,16 @@ def validate_move(game_id: str, move: MoveRecord) -> list[ValidationError]:
 
 def validate_game(game: GameRecord) -> list[ValidationError]:
     errors: list[ValidationError] = []
+    final_mate: tuple[int, facts.MatePattern] | None = None
     for move in game.moves:
         if move.is_guess_point:
             errors.extend(validate_move(game.id, move))
+            pattern = facts.mate_pattern(move.fen_before, move.uci)
+            if pattern.is_mate:
+                final_mate = (move.ply, pattern)
+    # The game TITLE often describes the finish ("...Mate") — hold it to the same
+    # mate-pattern truth (the original C2 error was in the title).
+    if game.title and final_mate:
+        ply, pattern = final_mate
+        errors.extend(check_mate_claims(game.title, pattern, game.id, ply))
     return errors

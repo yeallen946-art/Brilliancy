@@ -15,6 +15,7 @@ from __future__ import annotations
 import chess
 from pydantic import BaseModel, Field
 
+import facts
 from store import GameRecord, MoveRecord
 
 MODEL = "claude-opus-4-8"
@@ -25,16 +26,22 @@ SYSTEM_PROMPT = """\
 You are a chess coach writing short explanations for a "guess the master's move" trainer.
 
 HARD RULES (a validator rejects violations):
-- Ground EVERY chess claim in the engine data provided in the user message. Never mention
-  a move, line, square, or evaluation that is not present in that data.
+- You NARRATE the facts given in the user message; you never assert chess facts of your
+  own. Treat the supplied data as the entire universe: never mention a move, line, square,
+  piece role, or evaluation that is not present in it. You are describing THIS board, not
+  recalling any game you may think you recognize.
 - Be honest about the engine's view. If the master's move is NOT the engine's top choice,
   say so plainly. Never call a move "best", "winning", or "crushing" unless the evals
   support it.
 - Only name a move in algebraic notation if it is a legal move for the side to move in
   THIS position (i.e. it appears in the candidate list). Describe the OPPONENT's replies
   in words, never in notation.
-- Do NOT claim a move "wins", "loses", "drops", or "hangs" material unless that move's
-  engine reply line actually contains a capture. Material words must be backed by a capture.
+- Do NOT claim a move "wins", "loses", "drops", or "hangs" material unless the supplied
+  facts list a capture in that move's line. Material words must be backed by a listed capture.
+- When a mate is involved, the "MATE FACTS" line tells you exactly which pieces give check
+  and which cover the escape squares. Credit ONLY those pieces — no others.
+- Interpretive color ("the defense is overloaded") is welcome, but its direction must match
+  the evals: only describe a side as better/struggling if the numbers say so.
 
 STYLE:
 - Audience: 800-2000 rated improvers. Prefer plain plan-language over deep variations.
@@ -122,14 +129,19 @@ def candidate_rows(move: MoveRecord) -> list[dict]:
 
 
 def build_move_prompt(game: GameRecord, move: MoveRecord) -> str:
-    """User-message text: position + grounded engine data + what to annotate."""
+    """User-message text: position + engine data + computed facts (TECH_SPEC §5.1).
+
+    Game identity is deliberately ABSENT — the model describes this board, not its
+    (possibly wrong) memory of a famous game. `game` is accepted for call-site
+    compatibility but never read.
+    """
+    _ = game  # identity intentionally unused (§5.1 strip-identity rule)
     board = chess.Board(move.fen_before)
     mover = "White" if board.turn == chess.WHITE else "Black"
     master_san = _san(move.fen_before, move.uci)
     rows = candidate_rows(move)
 
     lines = [
-        f"Game: {game.white} vs {game.black}, {game.event} {game.year}.",
         f"Position (FEN): {move.fen_before}",
         f"{mover} to move. The master played: {master_san}.",
         "",
@@ -142,6 +154,15 @@ def build_move_prompt(game: GameRecord, move: MoveRecord) -> str:
         refutation = entry.get("refutation_pv") or []
         ref = f"  reply: {' '.join(refutation)}" if refutation else ""
         lines.append(f"  {r['san']:7s} {r['eval']:>6s}  ({r['motif']}){tag}{ref}")
+        # Computed facts per candidate (the only material/mate claims allowed):
+        mat = facts.line_material(move.fen_before, r["uci"], refutation)
+        if mat.captures:
+            lines.append(f"           captures in line: {', '.join(mat.captures)} "
+                         f"(net {mat.net_pawns:+d} pawn-units for the mover)")
+        pattern = facts.mate_pattern(move.fen_before, r["uci"])
+        if pattern.is_mate:
+            lines.append(f"           MATE FACTS: checking piece(s): {', '.join(pattern.checkers)}; "
+                         f"escape squares covered by: {', '.join(pattern.supporters) or 'none needed'}")
 
     alt_sans = ", ".join(r["san"] for r in rows if not r["is_master"])
     lines += [
