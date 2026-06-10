@@ -1,13 +1,19 @@
 import SwiftUI
 
-/// S5 "Train" — first honest version: a flat, playable list of all bundled games.
-/// Pack browsing (by player / by theme) + premium locks arrive with M4's
-/// EntitlementStore; this screen is structured so packs slot in above the list.
+/// S5 "Train" — a flat, playable list of all bundled games, now with the freemium
+/// split (PRD §7): free users play the FreeTier sample slice; locked rows show a
+/// lock and summon the paywall (S8). Pack browsing slots in above this list later.
 struct TrainView: View {
     let userStore: UserStore?
+    @Environment(EntitlementStore.self) private var entitlements
     @State private var playing: GameContent?
+    @State private var paywall: PaywallTrigger?
 
     private let games: [GameContent] = ContentStore.bundledGames()
+
+    private var unlockedIDs: Set<String> {
+        entitlements.isPremium ? Set(games.map(\.id)) : FreeTier.unlockedGameIDs(in: games)
+    }
 
     var body: some View {
         NavigationStack {
@@ -28,7 +34,10 @@ struct TrainView: View {
                         }
 
                         ForEach(games) { game in
-                            Button { playing = game } label: {
+                            let unlocked = unlockedIDs.contains(game.id)
+                            Button {
+                                if unlocked { playing = game } else { paywall = .lockedGame }
+                            } label: {
                                 HStack {
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(game.title)
@@ -39,7 +48,11 @@ struct TrainView: View {
                                             .foregroundStyle(Theme.textSecondary)
                                     }
                                     Spacer()
-                                    if userStore?.completedGameIds().contains(game.id) == true {
+                                    if !unlocked {
+                                        Image(systemName: "lock.fill")
+                                            .font(.system(size: 13))
+                                            .foregroundStyle(Theme.textSecondary)
+                                    } else if userStore?.completedGameIds().contains(game.id) == true {
                                         Image(systemName: "checkmark.circle.fill")
                                             .foregroundStyle(Theme.feedbackGreen)
                                     }
@@ -62,6 +75,9 @@ struct TrainView: View {
             .toolbarColorScheme(.dark, for: .navigationBar)
             .fullScreenCover(item: $playing) { game in
                 GuessSessionView(game: game, userStore: userStore) { playing = nil }
+            }
+            .sheet(item: $paywall) { trigger in
+                PaywallView(trigger: trigger) { paywall = nil }
             }
         }
     }

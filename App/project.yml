@@ -90,6 +90,9 @@ schemes:
         BrilliancyUITests: [test]
     run:
       config: Debug
+      # Local StoreKit catalog (M4): lets the simulator exercise purchase/restore
+      # without App Store Connect. Mirrors PRD §7 products/prices exactly.
+      storeKitConfiguration: Brilliancy.storekit
     test:
       config: Debug
       targets:

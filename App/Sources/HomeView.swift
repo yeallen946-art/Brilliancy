@@ -6,9 +6,11 @@ import SwiftUI
 struct HomeView: View {
     /// Shared app-wide store, owned by RootTabView (one user.sqlite connection).
     let userStore: UserStore?
+    @Environment(EntitlementStore.self) private var entitlements
 
     @State private var playing: GameContent?
     @State private var dailyGame: GameContent?
+    @State private var paywall: PaywallTrigger?
 
     /// Pipeline content from the bundled content.sqlite (GRDB path Mac-verified,
     /// issue #3). User-visible content comes from the DB; the M1 sample remains only
@@ -18,6 +20,12 @@ struct HomeView: View {
     /// nil when the DB is missing/unreadable AND the daily hasn't loaded —
     /// ContentStore degrades to [] by contract, so never index into the library.
     private var featured: GameContent? { dailyGame ?? library.first }
+
+    /// Freemium split (PRD §7): the daily challenge is always free; library rows
+    /// follow the same FreeTier rule as the Train tab.
+    private var unlockedIDs: Set<String> {
+        entitlements.isPremium ? Set(library.map(\.id)) : FreeTier.unlockedGameIDs(in: library)
+    }
 
     var body: some View {
         NavigationStack {
@@ -53,6 +61,9 @@ struct HomeView: View {
                     userStore: userStore,
                     isDaily: game.id == dailyGame?.id
                 ) { playing = nil }
+            }
+            .sheet(item: $paywall) { trigger in
+                PaywallView(trigger: trigger) { paywall = nil }
             }
             .task {
                 dailyGame = await DailyChallengeLoader().todaysGame()
@@ -99,14 +110,25 @@ struct HomeView: View {
                 .kerning(0.8)
                 .foregroundStyle(Theme.textSecondary)
             ForEach(library) { game in
-                Button { playing = game } label: {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(game.title)
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(Theme.textPrimary)
-                        Text(game.subtitle)
-                            .font(.system(size: 11))
-                            .foregroundStyle(Theme.textSecondary)
+                let unlocked = unlockedIDs.contains(game.id)
+                Button {
+                    if unlocked { playing = game } else { paywall = .lockedGame }
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(game.title)
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundStyle(Theme.textPrimary)
+                            Text(game.subtitle)
+                                .font(.system(size: 11))
+                                .foregroundStyle(Theme.textSecondary)
+                        }
+                        Spacer()
+                        if !unlocked {
+                            Image(systemName: "lock.fill")
+                                .font(.system(size: 13))
+                                .foregroundStyle(Theme.textSecondary)
+                        }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .cardSurface(padding: Theme.Space.sm)
@@ -119,4 +141,5 @@ struct HomeView: View {
 
 #Preview {
     HomeView(userStore: UserStore.onDisk())
+        .environment(EntitlementStore())
 }

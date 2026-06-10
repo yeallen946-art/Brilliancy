@@ -5,9 +5,12 @@ import SwiftUI
 struct GameSummaryView: View {
     let model: GuessSessionModel
     var userStore: UserStore?
+    var isDaily: Bool = false
     var onClose: () -> Void
 
+    @Environment(EntitlementStore.self) private var entitlements
     @State private var shareImage: Image?
+    @State private var paywall: PaywallTrigger?
 
     var body: some View {
         VStack(spacing: Theme.Space.lg) {
@@ -49,9 +52,28 @@ struct GameSummaryView: View {
                 }
             }
 
+            // Post-daily upsell (TECH_SPEC §6 conversion trigger #1). Coach tone:
+            // invite deeper training, never scold the result.
+            if isDaily && !entitlements.isPremium {
+                VStack(spacing: Theme.Space.xs) {
+                    Text("Enjoyed today's game? The full library unlocks more master games like this, with AI insights on every move.")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Theme.textSecondary)
+                        .multilineTextAlignment(.center)
+                    Button("Explore the library") { paywall = .postDaily }
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(Theme.gold)
+                        .accessibilityIdentifier("postDailyUpsellButton")
+                }
+                .cardSurface(padding: Theme.Space.sm)
+            }
+
             Button("Done") { onClose() }.buttonStyle(GoldButtonStyle())
         }
         .frame(maxWidth: .infinity)
+        .sheet(item: $paywall) { trigger in
+            PaywallView(trigger: trigger) { paywall = nil }
+        }
         .task {
             // Render once; streak is read AFTER the session was recorded (the recording
             // task in GuessSessionView runs on the same summary transition).
