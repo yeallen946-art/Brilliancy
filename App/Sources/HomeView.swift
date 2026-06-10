@@ -5,16 +5,12 @@ import SwiftUI
 struct HomeView: View {
     @State private var playing: GameContent?
 
-    /// Pipeline content from the bundled content.sqlite; falls back to the generated
-    /// literals if the DB is missing/unreadable. The M1 Byrne–Fischer sample (not in
-    /// the DB — placeholder evals) is always appended last.
-    private let library: [GameContent] = {
-        let bundled = ContentStore.bundledGames()
-        let fromPipeline = bundled.isEmpty
-            ? [SampleGames.operaGame, SampleGames.reti]
-            : bundled
-        return fromPipeline + [SampleGames.gameOfTheCentury]
-    }()
+    /// Pipeline content from the bundled content.sqlite (GRDB path Mac-verified,
+    /// issue #3 — the generated-literal fallback is gone). The M1 Byrne–Fischer
+    /// sample (placeholder evals, also used by unit tests) is appended last, which
+    /// also guarantees the library is never empty if the DB fails to load.
+    private let library: [GameContent] =
+        ContentStore.bundledGames() + [SampleGames.gameOfTheCentury]
 
     private var featured: GameContent { library[0] }
 
