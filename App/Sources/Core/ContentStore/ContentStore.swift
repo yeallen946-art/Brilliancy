@@ -70,6 +70,7 @@ enum ContentStore {
     private static func contentMove(from row: Row) -> ContentMove {
         let fenBefore: String = row["fen_before"]
         let isGuessPoint = (row["is_guess_point"] as Int? ?? 0) == 1
+        let entries = isGuessPoint ? evalEntries(fromJson: row["legal_evals"]) : [:]
         return ContentMove(
             ply: row["ply"],
             uci: row["uci"],
@@ -79,7 +80,9 @@ enum ContentStore {
             isGuessPoint: isGuessPoint,
             tags: tags(fromJson: row["tags"]),
             annotation: row["annotation"],
-            candidateEvals: isGuessPoint ? candidateEvals(fromJson: row["legal_evals"]) : [:],
+            candidateEvals: clampedEvals(entries),
+            candidateDetails: candidateDetails(entries),
+            altAnnotations: isGuessPoint ? stringMap(fromJson: row["alt_annotations"]) : [:],
             difficulty: row["difficulty"] ?? 1200
         )
     }
@@ -89,12 +92,38 @@ enum ContentStore {
         fen.split(separator: " ").dropFirst().first == "b" ? .black : .white
     }
 
+    /// Decode a legal_evals JSON blob ({uci: {cp, mate, refutation_pv, san, ...}}).
+    /// Snake-case strategy for the field names; UCI dictionary keys contain no
+    /// underscores so they pass through unchanged (same trick as DailyChallenge).
+    static func evalEntries(fromJson json: String?) -> [String: EvalEntry] {
+        guard let data = json?.data(using: .utf8) else { return [:] }
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return (try? decoder.decode([String: EvalEntry].self, from: data)) ?? [:]
+    }
+
     /// legal_evals JSON ({uci: {cp, mate, ...}}) -> candidateEvals [uci: clamped cp].
     static func candidateEvals(fromJson json: String?) -> [String: Int] {
+        clampedEvals(evalEntries(fromJson: json))
+    }
+
+    /// Display-only per-candidate info from decoded entries (shared with the daily path).
+    static func candidateDetails(_ entries: [String: EvalEntry]) -> [String: CandidateDetail] {
+        entries.mapValues { entry in
+            CandidateDetail(
+                san: entry.san,
+                refutationSan: entry.refutationSan ?? [],
+                motif: entry.motif
+            )
+        }
+    }
+
+    /// Generic {string: string} JSON (alt_annotations). [:] on garbage.
+    static func stringMap(fromJson json: String?) -> [String: String] {
         guard let data = json?.data(using: .utf8),
-              let entries = try? JSONDecoder().decode([String: EvalEntry].self, from: data)
+              let map = try? JSONDecoder().decode([String: String].self, from: data)
         else { return [:] }
-        return clampedEvals(entries)
+        return map
     }
 
     /// Mate-clamp a decoded legal_evals map. Shared by the DB path and the daily-JSON
@@ -115,9 +144,14 @@ enum ContentStore {
         return raw.compactMap(GuessTag.init(rawValue:))
     }
 
-    /// Only the fields we consume; extra keys (refutation_pv, motif) are ignored.
+    /// One legal_evals entry. refutation_pv (raw UCI) is intentionally NOT decoded —
+    /// the app displays the precomputed refutation_san instead (no SAN gen on device).
+    /// Decoded with .convertFromSnakeCase on BOTH the DB and daily-JSON paths.
     struct EvalEntry: Decodable {
         let cp: Int?
         let mate: Int?
+        let san: String?
+        let refutationSan: [String]?
+        let motif: String?
     }
 }

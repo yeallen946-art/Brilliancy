@@ -67,6 +67,21 @@ final class GuessSessionModel {
     /// 1-based "Move N" in chess move-pair terms, for the header.
     var currentMoveNumber: Int { ((currentMove?.ply ?? 1) + 1) / 2 }
 
+    /// Why the user's guess falls short (valid while revealed; nil when the guess
+    /// deserved full credit instead of an explanation). PRD §6 second half.
+    var wrongGuessExplanation: WrongGuessExplainer.Explanation? {
+        guard phase == .revealed,
+              let evaluation = lastEvaluation,
+              let guessUci = lastGuessUci,
+              let point = currentMove
+        else { return nil }
+        return WrongGuessExplainer.explanation(
+            guessUci: guessUci,
+            evaluation: evaluation,
+            point: point
+        )
+    }
+
     var guessPointsDone: Int { results.count }
 
     // MARK: - Transitions

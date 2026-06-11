@@ -39,9 +39,10 @@ final class ContentStoreTests: XCTestCase {
                  'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1',
                  1, 1450.0, '["tactical"]', 30, NULL,
                  '{"e7e5": {"cp": 30, "mate": null, "refutation_pv": [], "motif": "best"},
-                   "f7f5": {"cp": null, "mate": -2, "refutation_pv": [], "motif": "blunder"},
+                   "f7f5": {"cp": null, "mate": -2, "refutation_pv": ["d1h5", "g7g6"], "motif": "blunder",
+                            "san": "f5", "refutation_san": ["Qh5+", "g6"]},
                    "d7d5": {"cp": null, "mate": 3, "refutation_pv": [], "motif": "best"}}',
-                 'A fine move.', '{}')
+                 'A fine move.', '{"f7f5": "This walks into a quick king hunt."}')
                 """)
         }
         return dbQueue
@@ -79,6 +80,25 @@ final class ContentStoreTests: XCTestCase {
         XCTAssertEqual(evals["f7f5"], -ContentStore.mateBaseCp + 200)      // mated in 2
         // The mating move must outrank any cp move (TECH_SPEC §3.2 clamp).
         XCTAssertGreaterThan(evals["d7d5"]!, evals["e7e5"]!)
+    }
+
+    func testCandidateDetailsAndAltAnnotations() throws {
+        let games = try makeDb().read { try ContentStore.games(in: $0) }
+        let guess = try XCTUnwrap(games.first?.moves[1])
+
+        // Enriched entry: SAN + refutation SAN + motif surface for display.
+        XCTAssertEqual(
+            guess.candidateDetails["f7f5"],
+            CandidateDetail(san: "f5", refutationSan: ["Qh5+", "g6"], motif: "blunder"))
+        // Unenriched entry (older DB): present, with nil san and empty refutation.
+        XCTAssertEqual(
+            guess.candidateDetails["e7e5"],
+            CandidateDetail(san: nil, refutationSan: [], motif: "best"))
+
+        XCTAssertEqual(guess.altAnnotations, ["f7f5": "This walks into a quick king hunt."])
+        // Non-guess-point rows carry no candidate data.
+        XCTAssertTrue(games.first!.moves[0].altAnnotations.isEmpty)
+        XCTAssertTrue(games.first!.moves[0].candidateDetails.isEmpty)
     }
 
     func testJsonHelpersTolerateGarbage() {

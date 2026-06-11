@@ -10,6 +10,8 @@ import json
 import os
 import sqlite3
 
+import chess
+
 from store import GameRecord
 
 SCHEMA = """
@@ -32,12 +34,44 @@ CREATE TABLE packs (
 """
 
 
+def enrich_legal_evals(fen_before: str, legal_evals: dict | None) -> dict | None:
+    """Add display-only fields to each candidate: its own SAN ("Qxf7") and the
+    refutation line in SAN. Precomputed here so the app NEVER generates SAN at
+    runtime (TECH_SPEC §10 precompute-everything; CLAUDE.md hard rule #5 — no
+    on-device move-gen surface). Idempotent: recomputes/overwrites both keys.
+    """
+    if not legal_evals:
+        return legal_evals
+    board = chess.Board(fen_before)
+    out: dict = {}
+    for uci, entry in legal_evals.items():
+        enriched = dict(entry)
+        try:
+            move = chess.Move.from_uci(uci)
+            enriched["san"] = board.san(move)
+            reply_board = board.copy()
+            reply_board.push(move)
+            refutation_san = []
+            for reply_uci in entry.get("refutation_pv") or []:
+                reply = chess.Move.from_uci(reply_uci)
+                refutation_san.append(reply_board.san(reply))
+                reply_board.push(reply)
+            enriched["refutation_san"] = refutation_san
+        except (ValueError, AssertionError):
+            # Illegal/garbled uci: ship the entry unenriched rather than fail the
+            # build — 5_validate guards move legality upstream.
+            pass
+        out[uci] = enriched
+    return out
+
+
 def _move_row(game_id: str, m) -> tuple:
     return (
         game_id, m.ply, m.san, m.uci, m.fen_before,
         1 if m.is_guess_point else 0, m.difficulty, json.dumps(m.tags),
         m.eval_cp, m.eval_mate,
-        json.dumps(m.legal_evals), m.annotation, json.dumps(m.alt_annotations),
+        json.dumps(enrich_legal_evals(m.fen_before, m.legal_evals)),
+        m.annotation, json.dumps(m.alt_annotations),
     )
 
 
@@ -109,7 +143,8 @@ def daily_payload(game: GameRecord, date: str) -> dict:
                     "ply": m.ply, "san": m.san, "uci": m.uci, "fen_before": m.fen_before,
                     "is_guess_point": m.is_guess_point, "difficulty": m.difficulty,
                     "tags": m.tags, "eval_cp": m.eval_cp, "eval_mate": m.eval_mate,
-                    "legal_evals": m.legal_evals, "annotation": m.annotation,
+                    "legal_evals": enrich_legal_evals(m.fen_before, m.legal_evals),
+                    "annotation": m.annotation,
                     "alt_annotations": m.alt_annotations,
                 }
                 for m in game.moves

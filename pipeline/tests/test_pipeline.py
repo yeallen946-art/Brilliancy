@@ -224,6 +224,35 @@ def test_daily_payload_shape():
     assert payload["game"]["hero_color"] == "white"
 
 
+def test_enrich_legal_evals_adds_san_and_refutation_san():
+    evals = {
+        "e2e4": {"cp": 30, "refutation_pv": ["d7d5", "e4d5"], "motif": "best"},
+        "g1f3": {"cp": 20, "refutation_pv": [], "motif": "ok"},
+    }
+    out = build.enrich_legal_evals(START_FEN, evals)
+    assert out["e2e4"]["san"] == "e4"
+    assert out["e2e4"]["refutation_san"] == ["d5", "exd5"]   # capture rendered as SAN
+    assert out["g1f3"]["san"] == "Nf3"
+    assert out["g1f3"]["refutation_san"] == []
+    # Original engine fields untouched.
+    assert out["e2e4"]["cp"] == 30 and out["e2e4"]["motif"] == "best"
+    # Empty/None passthrough.
+    assert build.enrich_legal_evals(START_FEN, None) is None
+    assert build.enrich_legal_evals(START_FEN, {}) == {}
+
+
+def test_enrich_legal_evals_skips_garbled_uci_without_failing():
+    out = build.enrich_legal_evals(START_FEN, {"zz9": {"cp": 0, "refutation_pv": []}})
+    assert "san" not in out["zz9"]          # left unenriched, build survives
+
+
+def test_build_outputs_carry_enriched_san():
+    payload = build.daily_payload(_approved_game(), "2026-06-09")
+    evals = payload["game"]["moves"][0]["legal_evals"]
+    assert evals["e2e4"]["san"] == "e4"
+    assert evals["e2e4"]["refutation_san"] == []
+
+
 def test_daily_date_rejects_partial_pgn_dates():
     assert build.daily_date_or_none("1956.10.17") == "1956-10-17"
     assert build.daily_date_or_none("1910.??.??") is None   # classic PGN, no month/day

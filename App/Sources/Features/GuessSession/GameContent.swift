@@ -36,6 +36,14 @@ struct ContentMove: Identifiable {
     /// uci -> eval cp from the mover's POV (higher = better). The best candidate is the max.
     /// M1: only a few entries (master + maybe one alt). M2 fills EVERY legal move (TECH_SPEC §4).
     let candidateEvals: [String: Int]
+    /// uci -> display info per candidate, all PRECOMPUTED by the pipeline (build.py
+    /// enrich_legal_evals): the move's own SAN, the refutation line in SAN, motif.
+    /// Display-only; scoring stays on candidateEvals.
+    let candidateDetails: [String: CandidateDetail]
+    /// uci -> pipeline prose for the "interesting" wrong moves (TECH_SPEC §4
+    /// alt_annotations). Long-tail moves are absent here and get a runtime template
+    /// built from engine data (WrongGuessExplainer) — never freestyle commentary.
+    let altAnnotations: [String: String]
     /// Guess-point difficulty for the rating model (TECH_SPEC §3.3). Placeholder in M1.
     let difficulty: Double
 
@@ -53,6 +61,8 @@ struct ContentMove: Identifiable {
         tags: [GuessTag],
         annotation: String?,
         candidateEvals: [String: Int],
+        candidateDetails: [String: CandidateDetail] = [:],
+        altAnnotations: [String: String] = [:],
         difficulty: Double = 1200
     ) {
         self.ply = ply
@@ -64,8 +74,18 @@ struct ContentMove: Identifiable {
         self.tags = tags
         self.annotation = annotation
         self.candidateEvals = candidateEvals
+        self.candidateDetails = candidateDetails
+        self.altAnnotations = altAnnotations
         self.difficulty = difficulty
     }
+}
+
+/// Display-only facts about one candidate move at a guess point, precomputed by the
+/// pipeline (no SAN generation on device — TECH_SPEC §10).
+struct CandidateDetail: Equatable {
+    let san: String?
+    let refutationSan: [String]
+    let motif: String?
 }
 
 /// Weakness-breakdown tags (TECH_SPEC §3.3).

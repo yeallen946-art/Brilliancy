@@ -38,6 +38,8 @@ enum DailyChallenge {
         // leaves them intact; only the field names are converted.
         let legalEvals: [String: ContentStore.EvalEntry]?
         let annotation: String?
+        // UCI-keyed prose map, same no-underscore-keys trick as legalEvals.
+        let altAnnotations: [String: String]?
     }
 
     // MARK: - CDN location
@@ -80,6 +82,10 @@ enum DailyChallenge {
                 candidateEvals: move.isGuessPoint
                     ? ContentStore.clampedEvals(move.legalEvals ?? [:])
                     : [:],
+                candidateDetails: move.isGuessPoint
+                    ? ContentStore.candidateDetails(move.legalEvals ?? [:])
+                    : [:],
+                altAnnotations: move.isGuessPoint ? (move.altAnnotations ?? [:]) : [:],
                 difficulty: move.difficulty ?? 1200
             )
         }

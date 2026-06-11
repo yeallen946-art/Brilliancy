@@ -123,9 +123,27 @@ struct GuessSessionView: View {
                 feedbackBanner(eval)
             }
             board(interactive: false, emphasis: revealEmphasis)
+            if let wrong = model.wrongGuessExplanation {
+                wrongGuessCard(wrong)
+            }
             annotationCard
             Button("Next") { model.proceed() }.buttonStyle(GoldButtonStyle())
         }
+    }
+
+    /// Why the user's move falls short (PRD §6) — pipeline prose or engine-templated.
+    private func wrongGuessCard(_ wrong: WrongGuessExplainer.Explanation) -> some View {
+        VStack(alignment: .leading, spacing: Theme.Space.xs) {
+            Text("You played \(wrong.guessSan)")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Theme.textSecondary)
+            Text(wrong.text)
+                .font(.system(size: 13)).foregroundStyle(Theme.textPrimary)
+                .lineSpacing(5).fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .cardSurface()
+        .accessibilityIdentifier("wrongGuessCard")
     }
 
     private func feedbackBanner(_ eval: GuessEvaluation) -> some View {
