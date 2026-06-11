@@ -25,6 +25,7 @@ _STYLE = """
  .alt { color: #444; font-size: 0.95em; }
  .facts { color: #246; font-size: 0.9em; background: #eef4fb; padding: .4rem .6rem; border-radius: 6px; }
  .spoiler-check { color: #832; font-size: 0.9em; }
+ .zh { color: #354; }
  h3 { margin: 0 0 .4rem; }
 </style>
 """
@@ -106,10 +107,14 @@ def render_game_html(game: GameRecord) -> str:
         # ground truth, not memory.
         parts.append(f"<p class='facts'><b>Facts:</b> {_esc(_fact_sheet(move))}</p>")
         parts.append(f"<p>{_esc(move.annotation or '(no annotation yet)')}</p>")
+        if move.annotation_zh:
+            parts.append(f"<p class='zh'>{_esc(move.annotation_zh)}</p>")
         if move.alt_annotations:
             parts.append("<div class='alt'><b>Alternatives:</b><ul>")
             for uci, prose in move.alt_annotations.items():
-                parts.append(f"<li><b>{_esc(_san(move.fen_before, uci))}</b>: {_esc(prose)}</li>")
+                zh = (move.alt_annotations_zh or {}).get(uci)
+                zh_html = f"<br><span class='zh'>{_esc(zh)}</span>" if zh else ""
+                parts.append(f"<li><b>{_esc(_san(move.fen_before, uci))}</b>: {_esc(prose)}{zh_html}</li>")
             parts.append("</ul></div>")
         parts.append("</div></div>")
 

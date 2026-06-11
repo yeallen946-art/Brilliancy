@@ -98,6 +98,12 @@ def build_audit_prompt(move: MoveRecord, upcoming_sans: list[str]) -> str:
     ]
     for uci, prose in (move.alt_annotations or {}).items():
         parts.append(f"\nALT NOTE ({uci}):\n{prose}")
+    # Chinese prose is audited against the SAME taxonomy (claims are claims in any
+    # language — the deterministic checks don't care how the claim was phrased).
+    if move.annotation_zh:
+        parts.append(f"\nANNOTATION PROSE (zh):\n{move.annotation_zh}")
+    for uci, prose in (move.alt_annotations_zh or {}).items():
+        parts.append(f"\nALT NOTE (zh, {uci}):\n{prose}")
     return "\n".join(parts)
 
 

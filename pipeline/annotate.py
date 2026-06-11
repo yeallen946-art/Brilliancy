@@ -21,6 +21,27 @@ from store import GameRecord, MoveRecord
 MODEL = "claude-opus-4-8"
 INTERESTING_TOP_N = 4        # engine top-N get prose; long-tail templated at runtime (§4)
 ANNOTATION_WORD_LIMIT = 60
+ANNOTATION_CHAR_LIMIT_ZH = 120   # zh counts characters, not words
+
+# Player-name 中译 (PRD §12.1 deterministic table — extend as the library grows;
+# names not in the table are kept in the original spelling, never invented).
+PLAYER_NAMES_ZH = {
+    "Paul Morphy": "保罗·莫菲", "Morphy": "莫菲",
+    "Richard Reti": "理查德·雷蒂", "Reti": "雷蒂", "Réti": "雷蒂",
+    "Savielly Tartakower": "萨维利·塔尔塔科维尔", "Tartakower": "塔尔塔科维尔",
+    "Adolf Anderssen": "阿道夫·安德森", "Anderssen": "安德森",
+    "Lionel Kieseritzky": "利昂内尔·基塞里茨基", "Kieseritzky": "基塞里茨基",
+    "Jean Dufresne": "让·杜弗雷涅", "Dufresne": "杜弗雷涅",
+    "Robert J. Fischer": "鲍比·费舍尔", "Fischer": "费舍尔",
+    "Donald Byrne": "唐纳德·伯恩", "Byrne": "伯恩",
+    "Duke Karl / Count Isouard": "布伦瑞克公爵与伊苏阿尔伯爵",
+    "Mikhail Tal": "米哈伊尔·塔尔", "Tal": "塔尔",
+    "Magnus Carlsen": "马格努斯·卡尔森", "Carlsen": "卡尔森",
+}
+
+
+def player_name_zh(name: str) -> str:
+    return PLAYER_NAMES_ZH.get(name, name)
 
 SYSTEM_PROMPT = """\
 You are a chess coach writing short explanations for a "guess the master's move" trainer.
@@ -51,6 +72,35 @@ STYLE:
 - Coach tone: encouraging, never mocking a wrong guess.
 - Keep every explanation under {limit} words.\
 """.format(limit=ANNOTATION_WORD_LIMIT)
+
+# zh narration (PRD §12.1): the SAME hard rules, narrating the SAME facts in Chinese.
+# Not a translation pass — the model writes Chinese directly from the engine data.
+SYSTEM_PROMPT_ZH = """\
+你是一名国际象棋教练,为"猜大师着法"训练应用撰写简短的中文讲解。
+
+硬性规则(校验器会拒绝违规内容):
+- 你只能叙述用户消息中提供的事实,绝不自行断言任何棋局事实。提供的数据就是全部世界:
+  不得提及数据中不存在的着法、变着、格子、棋子作用或评估。你描述的是这个棋盘,
+  不是你记忆中的任何名局。
+- 对引擎的评估保持诚实。大师着法若不是引擎首选,要直说。评估不支持时,
+  禁用"最佳""必胜""碾压"等说法。
+- 只有出现在候选着法列表中的着法才能用记谱法点名;着法记谱保留英文代数记谱法
+  (如 Bg5+、O-O-O),不要翻译成中文记谱。对手的应着用文字描述,不用记谱。
+- 除非该着法的变着数据中列有吃子,否则不得声称"得子""丢子""丢兵"等子力变化。
+- 涉及将杀时,"MATE FACTS"一行明确了哪些棋子参与将杀,只能归功于这些棋子。
+- 棋子与战术术语用以下对照,不得自创:兵/马/象/车/后/王;双吃(fork)、
+  牵制(pin)、闪将(discovered check)、串击(skewer)。
+- 解释性色彩(如"防线不堪重负")欢迎,但方向必须与评估一致。
+
+文风:
+- 读者为 800-2000 等级分的中文棋手。讲计划与威胁,不堆变着。
+- 教练语气,鼓励为主,绝不嘲讽猜错。
+- 每条讲解不超过 {limit} 个字符。\
+""".format(limit=ANNOTATION_CHAR_LIMIT_ZH)
+
+
+def system_prompt(lang: str = "en") -> str:
+    return SYSTEM_PROMPT_ZH if lang == "zh" else SYSTEM_PROMPT
 
 
 # ----------------------------------------------------------------- structured output
@@ -142,7 +192,7 @@ def upcoming_guess_sans(game: GameRecord, move: MoveRecord) -> list[str]:
     ]
 
 
-def build_move_prompt(game: GameRecord, move: MoveRecord) -> str:
+def build_move_prompt(game: GameRecord, move: MoveRecord, lang: str = "en") -> str:
     """User-message text: position + engine data + computed facts (TECH_SPEC §5.1).
 
     Game IDENTITY is deliberately absent — the model describes this board, not its
@@ -213,19 +263,41 @@ def build_move_prompt(game: GameRecord, move: MoveRecord) -> str:
         ]
 
     alt_sans = ", ".join(r["san"] for r in rows if not r["is_master"])
-    lines += [
-        "",
-        f"Write `annotation`: why {master_san} works — or, if the engine prefers another "
-        f"move, what {master_san} is going for, with the engine's honest view.",
-        f"Write `alt_annotations` for these moves only: {alt_sans or '(none)'}. For each, "
-        "base the note on THAT move's engine reply line above; say why a guesser might try "
-        "it and why it is worse. Describe the opponent's replies in words, not notation, and "
-        "claim material loss only if that reply line shows a capture.",
-    ]
+    if lang == "zh":
+        motif_table = ", ".join(f"{en}={zh}" for en, zh in facts.MOTIF_ZH.items())
+        piece_table = ", ".join(f"{en}={zh}" for en, zh in facts.PIECE_NAMES_ZH.items())
+        lines += [
+            "",
+            f"用中文写 `annotation`:为什么 {master_san} 成立 — 若引擎更偏好别的着法,"
+            f"则说明 {master_san} 的意图并诚实给出引擎观点。",
+            f"用中文为这些着法写 `alt_annotations`(仅限这些):{alt_sans or '(无)'}。"
+            "每条都以上方该着法自己的引擎应着变化为依据;说明猜棋的人为何会想走它、为何不如实着。"
+            "对手应着用文字描述不用记谱;只有该变化中列了吃子才能声称子力得失。",
+            f"术语对照(只用这些):棋子 {piece_table};战术 {motif_table}。"
+            "着法记谱保留英文代数记谱法。",
+        ]
+    else:
+        lines += [
+            "",
+            f"Write `annotation`: why {master_san} works — or, if the engine prefers another "
+            f"move, what {master_san} is going for, with the engine's honest view.",
+            f"Write `alt_annotations` for these moves only: {alt_sans or '(none)'}. For each, "
+            "base the note on THAT move's engine reply line above; say why a guesser might try "
+            "it and why it is worse. Describe the opponent's replies in words, not notation, and "
+            "claim material loss only if that reply line shows a capture.",
+        ]
     return "\n".join(lines)
 
 
-def build_intro_prompt(game: GameRecord) -> str:
+def build_intro_prompt(game: GameRecord, lang: str = "en") -> str:
+    if lang == "zh":
+        return (
+            f"用中文写 2-3 句对局引言:{player_name_zh(game.white)}(白)对 "
+            f"{player_name_zh(game.black)}(黑),{game.event} {game.year}。"
+            f"要研究的一方是{'白方' if game.hero_color == 'white' else '黑方'}。"
+            "渲染气氛、制造期待。不得透露结果或任何具体着法。"
+            "棋手名按给出的中译;表中没有的名字保留原文。"
+        )
     return (
         f"Write a 2-3 sentence narrative intro for this game: "
         f"{game.white} vs {game.black}, {game.event} {game.year}. "
@@ -236,6 +308,11 @@ def build_intro_prompt(game: GameRecord) -> str:
 
 # --------------------------------------------------------------------- apply results
 
-def apply_move_annotation(move: MoveRecord, result: MoveAnnotationResult) -> None:
-    move.annotation = result.annotation
-    move.alt_annotations = {a.uci: a.prose for a in result.alt_annotations}
+def apply_move_annotation(move: MoveRecord, result: MoveAnnotationResult,
+                          lang: str = "en") -> None:
+    if lang == "zh":
+        move.annotation_zh = result.annotation
+        move.alt_annotations_zh = {a.uci: a.prose for a in result.alt_annotations}
+    else:
+        move.annotation = result.annotation
+        move.alt_annotations = {a.uci: a.prose for a in result.alt_annotations}

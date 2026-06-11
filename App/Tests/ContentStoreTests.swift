@@ -13,13 +13,15 @@ final class ContentStoreTests: XCTestCase {
                 CREATE TABLE games (
                     id TEXT PRIMARY KEY,
                     white TEXT, black TEXT, event TEXT, year INTEGER, result TEXT, eco TEXT,
-                    hero_color TEXT, title TEXT, narrative_intro TEXT, pack_id TEXT, ply_count INTEGER
+                    hero_color TEXT, title TEXT, narrative_intro TEXT, pack_id TEXT, ply_count INTEGER,
+                    title_zh TEXT, narrative_intro_zh TEXT
                 );
                 CREATE TABLE moves (
                     game_id TEXT, ply INTEGER, san TEXT, uci TEXT, fen_before TEXT,
                     is_guess_point INTEGER, difficulty REAL, tags TEXT,
                     eval_cp INTEGER, eval_mate INTEGER,
                     legal_evals TEXT, annotation TEXT, alt_annotations TEXT,
+                    annotation_zh TEXT, alt_annotations_zh TEXT,
                     PRIMARY KEY (game_id, ply)
                 );
                 """)
@@ -27,14 +29,14 @@ final class ContentStoreTests: XCTestCase {
                 sql: """
                 INSERT INTO games VALUES
                 ('g1', 'White, W.', 'Black, B.', 'Test', 1910, '1-0', 'B15',
-                 'white', 'Test Game', 'An intro.', NULL, 2)
+                 'white', 'Test Game', 'An intro.', NULL, 2, NULL, NULL)
                 """)
             try db.execute(
                 sql: """
                 INSERT INTO moves VALUES
                 ('g1', 1, 'e4', 'e2e4',
                  'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
-                 0, 1200.0, '[]', NULL, NULL, '{}', NULL, '{}'),
+                 0, 1200.0, '[]', NULL, NULL, '{}', NULL, '{}', NULL, '{}'),
                 ('g1', 2, 'e5', 'e7e5',
                  'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1',
                  1, 1450.0, '["tactical"]', 30, NULL,
@@ -42,7 +44,8 @@ final class ContentStoreTests: XCTestCase {
                    "f7f5": {"cp": null, "mate": -2, "refutation_pv": ["d1h5", "g7g6"], "motif": "blunder",
                             "san": "f5", "refutation_san": ["Qh5+", "g6"]},
                    "d7d5": {"cp": null, "mate": 3, "refutation_pv": [], "motif": "best"}}',
-                 'A fine move.', '{"f7f5": "This walks into a quick king hunt."}')
+                 'A fine move.', '{"f7f5": "This walks into a quick king hunt."}',
+                 NULL, '{}')
                 """)
         }
         return dbQueue

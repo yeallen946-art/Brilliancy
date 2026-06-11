@@ -42,6 +42,10 @@ class MoveRecord:
     legal_evals: dict = field(default_factory=dict)
     annotation: str | None = None             # prose for the master move (stage 4)
     alt_annotations: dict = field(default_factory=dict)  # uci -> prose, interesting moves only
+    # Chinese prose (PRD §12.1): narrated from the SAME facts with lang="zh" —
+    # never a translation of the English. None/empty until a zh annotate run.
+    annotation_zh: str | None = None
+    alt_annotations_zh: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -62,6 +66,9 @@ class GameRecord:
     ply_count: int
     source_hash: str         # sha1 of the uci move sequence, for dedupe
     review_status: str
+    # Chinese narrative fields (PRD §12.1), filled by a zh annotate run.
+    title_zh: str | None = None
+    narrative_intro_zh: str | None = None
     moves: list[MoveRecord] = field(default_factory=list)
 
     @property

@@ -286,6 +286,113 @@ def test_move_prompt_carries_castling_fact():
     assert "kingside and queenside" in prompt
 
 
+# ----------------------------------------------------------- zh narration (PRD 12.1)
+
+def test_zh_prompt_carries_terminology_and_language_directive():
+    from annotate import build_move_prompt, system_prompt
+    game = _two_point_game("placeholder")
+    prompt = build_move_prompt(game, game.moves[0], lang="zh")
+    assert "用中文写" in prompt
+    assert "牵制" in prompt and "双吃" in prompt          # motif table from facts.py
+    assert "Position (FEN)" in prompt                      # same engine data, same facts
+    assert "SPOILER GUARD" in prompt                       # spoiler rules apply to zh too
+    assert "你是一名国际象棋教练" in system_prompt("zh")
+    assert "chess coach" in system_prompt("en")
+
+
+def test_apply_move_annotation_routes_by_lang():
+    from annotate import AltAnnotation, MoveAnnotationResult, apply_move_annotation
+    move = _gp_move(20, evals={"e2e4": {"cp": 30}})
+    result = MoveAnnotationResult(
+        annotation="中心兵推进,白方主动。",
+        alt_annotations=[AltAnnotation(uci="d2d4", prose="同样占中,但稍缓。")])
+    apply_move_annotation(move, result, lang="zh")
+    assert move.annotation_zh == "中心兵推进,白方主动。"
+    assert move.alt_annotations_zh == {"d2d4": "同样占中,但稍缓。"}
+    assert move.annotation == "x"                          # en untouched
+
+
+def test_validate_checks_zh_prose_with_zh_wordlists():
+    from validate import validate_move
+    # zh stuck-king claim while rights remain -> flagged.
+    move = MoveRecord(
+        ply=20, san="e4", uci="e2e4", fen_before=START_FEN, mover="white",
+        is_guess_point=True, annotation="e4 is fine.",
+        annotation_zh="e4 之后黑王被困在中路,无法易位。",
+        legal_evals={"e2e4": {"cp": 30}},
+    )
+    codes = {e.code for e in validate_move("g", move)}
+    assert "unsupported_stuck_king_claim" in codes
+    # zh material claim in an alt note without a capture in that line -> flagged.
+    move2 = MoveRecord(
+        ply=20, san="e4", uci="e2e4", fen_before=START_FEN, mover="white",
+        is_guess_point=True, annotation="e4 is fine.",
+        legal_evals={"e2e4": {"cp": 30}, "d2d4": {"cp": 10, "refutation_pv": []}},
+        alt_annotations_zh={"d2d4": "这步丢兵,不可取。"},
+    )
+    codes2 = {e.code for e in validate_move("g", move2)}
+    assert "unsupported_material_claim" in codes2
+
+
+def test_validate_zh_mate_credit_and_san_in_cjk_text():
+    from validate import extract_san_tokens, validate_move
+    # SAN glued to CJK must still be extracted (lookaround tokenizer).
+    assert "Bg5+" in extract_san_tokens("走Bg5+之后局面立刻崩溃")
+    # zh mate credit must match the computed pattern: fool's mate is QUEEN mate.
+    fools = "rnbqkbnr/pppp1ppp/8/4p3/6P1/5P2/PPPPP2P/RNBQKBNR b KQkq - 0 2"
+    move = MoveRecord(
+        ply=4, san="Qh4#", uci="d8h4", fen_before=fools, mover="black",
+        is_guess_point=True, annotation="Mate.",
+        annotation_zh="车将杀,干净利落。",     # WRONG piece: it's the queen
+        legal_evals={"d8h4": {"cp": None, "mate": 1}},
+    )
+    codes = {e.code for e in validate_move("g", move)}
+    assert "wrong_mating_pieces" in codes
+
+
+def test_build_carries_zh_fields():
+    game = _approved_game()
+    game.title_zh = "测试对局"
+    game.narrative_intro_zh = "一段中文引言。"
+    game.moves[0].annotation_zh = "e4 占据中心。"
+    game.moves[0].alt_annotations_zh = {"d2d4": "稍缓。"}
+    payload = build.daily_payload(game, "2026-06-12")
+    assert payload["game"]["title_zh"] == "测试对局"
+    assert payload["game"]["moves"][0]["annotation_zh"] == "e4 占据中心。"
+
+    import sqlite3, tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        db = os.path.join(tmp, "c.sqlite")
+        build.build_sqlite([game], db)
+        conn = sqlite3.connect(db)
+        try:
+            zh, alts = conn.execute(
+                "SELECT annotation_zh, alt_annotations_zh FROM moves").fetchone()
+            assert zh == "e4 占据中心。"
+            assert json.loads(alts) == {"d2d4": "稍缓。"}
+            title_zh, = conn.execute("SELECT title_zh FROM games").fetchone()
+            assert title_zh == "测试对局"
+        finally:
+            conn.close()
+
+
+def test_store_roundtrip_preserves_zh_and_tolerates_old_files():
+    game = _approved_game()
+    game.title_zh = "测试"
+    game.moves[0].annotation_zh = "中文讲解。"
+    data = store.game_to_dict(game)
+    loaded = store.game_from_dict(data)
+    assert loaded.title_zh == "测试"
+    assert loaded.moves[0].annotation_zh == "中文讲解。"
+    # Old work-store files (no zh keys) load with defaults.
+    del data["title_zh"], data["narrative_intro_zh"]
+    for m in data["moves"]:
+        del m["annotation_zh"], m["alt_annotations_zh"]
+    legacy = store.game_from_dict(data)
+    assert legacy.title_zh is None
+    assert legacy.moves[0].alt_annotations_zh == {}
+
+
 # ------------------------------------------------- guess-point refinement (school 2)
 
 def _gp_move(ply, uci="e2e4", san="e4", evals=None, gp=True):

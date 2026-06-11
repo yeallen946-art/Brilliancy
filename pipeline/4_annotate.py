@@ -21,13 +21,13 @@ import time
 import store
 from annotate import (
     MODEL,
-    SYSTEM_PROMPT,
     GameIntroResult,
     MoveAnnotationResult,
     apply_move_annotation,
     build_intro_prompt,
     build_move_prompt,
     strict_json_schema,
+    system_prompt,
 )
 
 
@@ -43,26 +43,29 @@ def _guess_points_with_evals(game) -> list:
     return [m for m in game.moves if m.is_guess_point and m.legal_evals]
 
 
-def run_no_batch(client, game) -> None:
+def run_no_batch(client, game, lang: str = "en") -> None:
     """Synchronous path — simplest, no 50% discount. Good for 1-5 games / debugging."""
     intro = client.messages.parse(
-        model=MODEL, max_tokens=512, system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": build_intro_prompt(game)}],
+        model=MODEL, max_tokens=512, system=system_prompt(lang),
+        messages=[{"role": "user", "content": build_intro_prompt(game, lang)}],
         output_format=GameIntroResult,
     )
-    game.narrative_intro = intro.parsed_output.narrative_intro
+    if lang == "zh":
+        game.narrative_intro_zh = intro.parsed_output.narrative_intro
+    else:
+        game.narrative_intro = intro.parsed_output.narrative_intro
 
     for move in _guess_points_with_evals(game):
         resp = client.messages.parse(
-            model=MODEL, max_tokens=1024, system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": build_move_prompt(game, move)}],
+            model=MODEL, max_tokens=1024, system=system_prompt(lang),
+            messages=[{"role": "user", "content": build_move_prompt(game, move, lang)}],
             output_format=MoveAnnotationResult,
         )
-        apply_move_annotation(move, resp.parsed_output)
-        print(f"  annotated ply {move.ply} ({move.san})")
+        apply_move_annotation(move, resp.parsed_output, lang)
+        print(f"  annotated ply {move.ply} ({move.san}) [{lang}]")
 
 
-def run_batch(client, game) -> None:
+def run_batch(client, game, lang: str = "en") -> None:
     """Batch API path (default) — one batch per game (intro + each guess point)."""
     from anthropic.types.message_create_params import MessageCreateParamsNonStreaming
     from anthropic.types.messages.batch_create_params import Request
@@ -70,8 +73,8 @@ def run_batch(client, game) -> None:
     requests = [Request(
         custom_id="intro",
         params=MessageCreateParamsNonStreaming(
-            model=MODEL, max_tokens=512, system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": build_intro_prompt(game)}],
+            model=MODEL, max_tokens=512, system=system_prompt(lang),
+            messages=[{"role": "user", "content": build_intro_prompt(game, lang)}],
             output_config=_output_config(GameIntroResult),
         ),
     )]
@@ -80,14 +83,14 @@ def run_batch(client, game) -> None:
         requests.append(Request(
             custom_id=f"ply-{move.ply}",
             params=MessageCreateParamsNonStreaming(
-                model=MODEL, max_tokens=1024, system=SYSTEM_PROMPT,
-                messages=[{"role": "user", "content": build_move_prompt(game, move)}],
+                model=MODEL, max_tokens=1024, system=system_prompt(lang),
+                messages=[{"role": "user", "content": build_move_prompt(game, move, lang)}],
                 output_config=_output_config(MoveAnnotationResult),
             ),
         ))
 
     batch = client.messages.batches.create(requests=requests)
-    print(f"  submitted batch {batch.id} ({len(requests)} requests); polling...")
+    print(f"  submitted batch {batch.id} ({len(requests)} requests, lang={lang}); polling...")
     while True:
         batch = client.messages.batches.retrieve(batch.id)
         if batch.processing_status == "ended":
@@ -101,10 +104,14 @@ def run_batch(client, game) -> None:
             continue
         text = _first_text(result.result.message)
         if result.custom_id == "intro":
-            game.narrative_intro = GameIntroResult.model_validate_json(text).narrative_intro
+            intro = GameIntroResult.model_validate_json(text).narrative_intro
+            if lang == "zh":
+                game.narrative_intro_zh = intro
+            else:
+                game.narrative_intro = intro
         else:
             ply = int(result.custom_id.split("-")[1])
-            apply_move_annotation(by_ply[ply], MoveAnnotationResult.model_validate_json(text))
+            apply_move_annotation(by_ply[ply], MoveAnnotationResult.model_validate_json(text), lang)
 
 
 def main() -> int:
@@ -112,6 +119,8 @@ def main() -> int:
     parser.add_argument("--game-id", required=True)
     parser.add_argument("--work-dir", default=store.WORK_DIR)
     parser.add_argument("--no-batch", action="store_true", help="synchronous, no 50%% discount")
+    parser.add_argument("--lang", choices=["en", "zh"], default="en",
+                        help="narration language (PRD 12.1: zh narrates the same facts)")
     args = parser.parse_args()
 
     if not os.environ.get("ANTHROPIC_API_KEY"):
@@ -127,8 +136,8 @@ def main() -> int:
         return 1
 
     client = anthropic.Anthropic()
-    print(f"Annotating {game.id}: {len(points)} guess point(s) + intro.")
-    (run_no_batch if args.no_batch else run_batch)(client, game)
+    print(f"Annotating {game.id}: {len(points)} guess point(s) + intro (lang={args.lang}).")
+    (run_no_batch if args.no_batch else run_batch)(client, game, args.lang)
 
     store.save_game(game, args.work_dir)
     print(f"Saved annotations to {store.game_path(game.id, args.work_dir)}.")

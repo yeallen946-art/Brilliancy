@@ -25,6 +25,22 @@ PIECE_VALUES = {
     chess.ROOK: 5, chess.QUEEN: 9, chess.KING: 0,
 }
 
+# ---- Chinese terminology (PRD §12.1: deterministic tables, never LLM-invented) ----
+# Single source of truth for zh chess terms; consumed by the annotate prompt and any
+# zh validation patterns. Moves stay in algebraic notation (Bg5+) in zh prose.
+
+PIECE_NAMES_ZH = {
+    "pawn": "兵", "knight": "马", "bishop": "象",
+    "rook": "车", "queen": "后", "king": "王",
+}
+
+MOTIF_ZH = {
+    "fork": "双吃",
+    "pin": "牵制",
+    "discovered_check": "闪将",
+    "skewer": "串击",
+}
+
 
 @dataclass
 class MatePattern:

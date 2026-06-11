@@ -18,13 +18,15 @@ SCHEMA = """
 CREATE TABLE games (
     id TEXT PRIMARY KEY,
     white TEXT, black TEXT, event TEXT, year INTEGER, result TEXT, eco TEXT,
-    hero_color TEXT, title TEXT, narrative_intro TEXT, pack_id TEXT, ply_count INTEGER
+    hero_color TEXT, title TEXT, narrative_intro TEXT, pack_id TEXT, ply_count INTEGER,
+    title_zh TEXT, narrative_intro_zh TEXT
 );
 CREATE TABLE moves (
     game_id TEXT, ply INTEGER, san TEXT, uci TEXT, fen_before TEXT,
     is_guess_point INTEGER, difficulty REAL, tags TEXT,
     eval_cp INTEGER, eval_mate INTEGER,
     legal_evals TEXT, annotation TEXT, alt_annotations TEXT,
+    annotation_zh TEXT, alt_annotations_zh TEXT,
     PRIMARY KEY (game_id, ply)
 );
 CREATE TABLE packs (
@@ -72,6 +74,7 @@ def _move_row(game_id: str, m) -> tuple:
         m.eval_cp, m.eval_mate,
         json.dumps(enrich_legal_evals(m.fen_before, m.legal_evals)),
         m.annotation, json.dumps(m.alt_annotations),
+        m.annotation_zh, json.dumps(m.alt_annotations_zh, ensure_ascii=False),
     )
 
 
@@ -86,12 +89,13 @@ def build_sqlite(games: list[GameRecord], db_path: str, packs: list[dict] | None
         conn.executescript(SCHEMA)
         for g in games:
             conn.execute(
-                "INSERT INTO games VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO games VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (g.id, g.white, g.black, g.event, g.year, g.result, g.eco,
-                 g.hero_color, g.title, g.narrative_intro, g.pack_id, g.ply_count),
+                 g.hero_color, g.title, g.narrative_intro, g.pack_id, g.ply_count,
+                 g.title_zh, g.narrative_intro_zh),
             )
             conn.executemany(
-                "INSERT INTO moves VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO moves VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 [_move_row(g.id, m) for m in g.moves],
             )
         for p in packs or []:
@@ -138,6 +142,10 @@ def daily_payload(game: GameRecord, date: str) -> dict:
             "event": game.event, "year": game.year, "result": game.result,
             "eco": game.eco, "hero_color": game.hero_color, "title": game.title,
             "narrative_intro": game.narrative_intro, "ply_count": game.ply_count,
+            # zh fields ride in the SAME payload (additive keys): the iOS decoder
+            # ignores them; the 小程序 client reads them (PRD §12).
+            "title_zh": game.title_zh,
+            "narrative_intro_zh": game.narrative_intro_zh,
             "moves": [
                 {
                     "ply": m.ply, "san": m.san, "uci": m.uci, "fen_before": m.fen_before,
@@ -146,6 +154,8 @@ def daily_payload(game: GameRecord, date: str) -> dict:
                     "legal_evals": enrich_legal_evals(m.fen_before, m.legal_evals),
                     "annotation": m.annotation,
                     "alt_annotations": m.alt_annotations,
+                    "annotation_zh": m.annotation_zh,
+                    "alt_annotations_zh": m.alt_annotations_zh,
                 }
                 for m in game.moves
             ],
