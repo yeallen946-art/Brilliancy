@@ -131,7 +131,8 @@ def tactical_motifs(fen_before: str, uci: str) -> list[str]:
       king/queen/rook (the classic family fork shape).
     - "pin": an enemy piece is absolutely pinned after the move that wasn't before.
     - "discovered_check": the position is check but the moved piece is not a checker.
-    Skewers/batteries etc. are future increments — better to miss a motif than invent one.
+    - "skewer": the moved slider hits a high-value piece with a lesser piece behind it.
+    Batteries etc. are future increments — better to miss a motif than invent one.
     """
     board = chess.Board(fen_before)
     try:
@@ -175,7 +176,42 @@ def tactical_motifs(fen_before: str, uci: str) -> list[str]:
     if board.is_check() and move.to_square not in board.checkers():
         motifs.append("discovered_check")
 
+    # skewer — the moved slider attacks a HIGH-value piece with a lesser piece
+    # behind it on the same ray (front K/Q/R, behind Q/R/B/N, front > behind).
+    if _is_skewer(board, move.to_square, opponent):
+        motifs.append("skewer")
+
     return motifs
+
+
+def _is_skewer(board: chess.Board, to_sq: int, opponent: bool) -> bool:
+    piece = board.piece_at(to_sq)
+    if piece is None or piece.piece_type not in (chess.BISHOP, chess.ROOK, chess.QUEEN):
+        return False
+    for victim_sq in board.attacks(to_sq):
+        victim = board.piece_at(victim_sq)
+        if victim is None or victim.color != opponent:
+            continue
+        if victim.piece_type not in (chess.KING, chess.QUEEN, chess.ROOK):
+            continue
+        front_value = 99 if victim.piece_type == chess.KING else PIECE_VALUES[victim.piece_type]
+        step_f = (chess.square_file(victim_sq) > chess.square_file(to_sq)) \
+            - (chess.square_file(victim_sq) < chess.square_file(to_sq))
+        step_r = (chess.square_rank(victim_sq) > chess.square_rank(to_sq)) \
+            - (chess.square_rank(victim_sq) < chess.square_rank(to_sq))
+        f = chess.square_file(victim_sq) + step_f
+        r = chess.square_rank(victim_sq) + step_r
+        while 0 <= f <= 7 and 0 <= r <= 7:
+            behind = board.piece_at(chess.square(f, r))
+            if behind is not None:
+                if (behind.color == opponent
+                        and behind.piece_type in (chess.QUEEN, chess.ROOK, chess.BISHOP, chess.KNIGHT)
+                        and front_value > PIECE_VALUES[behind.piece_type]):
+                    return True
+                break
+            f += step_f
+            r += step_r
+    return False
 
 
 def opponent_castling_rights(fen_before: str, uci: str) -> dict | None:

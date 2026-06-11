@@ -248,6 +248,20 @@ def test_move_prompt_drops_alternatives_colliding_with_future_answers():
     assert "d4" not in table
 
 
+def test_skewer_motif_detection():
+    import facts
+    # Bishop to a3 hits Qe7 with Rf8 behind on the same diagonal -> skewer.
+    fen = "5r1k/4q3/8/8/8/8/1B6/6K1 w - - 0 1"
+    assert "skewer" in facts.tactical_motifs(fen, "b2a3")
+    # Same geometry but ROOK in front (5) and QUEEN behind (9): front not more
+    # valuable -> NOT a skewer (that's closer to a pin shape).
+    fen2 = "5q1k/4r3/8/8/8/8/1B6/6K1 w - - 0 1"
+    assert "skewer" not in facts.tactical_motifs(fen2, "b2a3")
+    # King in front counts as maximal value: Ra8+ skewers the queen behind the king.
+    fen3 = "1kq5/8/8/8/8/8/8/R5K1 w - - 0 1"
+    assert "skewer" in facts.tactical_motifs(fen3, "a1a8")
+
+
 def test_opponent_castling_rights_fact():
     import facts
     # After 1.e4 Black retains both rights.
