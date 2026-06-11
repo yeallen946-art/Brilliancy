@@ -352,6 +352,19 @@ def test_audit_material_and_castling_and_motif():
                      "unsupported_stuck_king_claim"]
 
 
+def test_audit_material_claim_routed_to_alt_line():
+    from audit import ExtractedClaim, check_claims
+    move = _audit_move(legal_evals={
+        "e2e4": {"cp": 30, "refutation_pv": []},                   # master: no capture
+        "d2d4": {"cp": 10, "refutation_pv": ["e7e5", "d4e5"]},     # alt line HAS a capture
+    })
+    claim = ExtractedClaim(claim_class="material", quote="wins a pawn", alt_uci="d2d4")
+    assert check_claims("g", move, [claim], []) == []
+    # Same claim about the master line (no capture) must fail.
+    bare = ExtractedClaim(claim_class="material", quote="wins a pawn")
+    assert [e.code for e in check_claims("g", move, [bare], [])] == ["unsupported_material_claim"]
+
+
 def test_audit_interpretive_claims_pass():
     from audit import check_claims
     claims = [_claim("eval_verdict", "White is better"),

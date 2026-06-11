@@ -50,6 +50,10 @@ class ExtractedClaim(BaseModel):
     piece: str | None = Field(
         default=None,
         description="Piece kind the claim is about (pawn/knight/bishop/rook/queen/king), if any.")
+    alt_uci: str | None = Field(
+        default=None,
+        description="UCI from the ALT NOTE header when the claim appears in an alt note; "
+                    "null for claims in the main annotation.")
 
 
 class AuditResult(BaseModel):
@@ -76,7 +80,8 @@ for one position. List EVERY claim the prose makes, each as one of these classes
 - other: a checkable-sounding claim that fits none of the above.
 
 Extract exhaustively: one prose sentence can yield several claims. Copy the exact
-quote. Set `piece` when the claim is about a specific piece kind. Do not judge
+quote. Set `piece` when the claim is about a specific piece kind. Set `alt_uci` to
+the UCI in the ALT NOTE header when the claim appears in an alt note. Do not judge
 whether claims are TRUE — only classify them.\
 """
 
@@ -184,11 +189,15 @@ def check_claims(
                         f"{where}: {claim.piece} does not participate in the line-end mate"))
 
         elif kind == "material":
-            mat = facts.line_material(move.fen_before, move.uci, _master_line(move))
+            # Check against the line of the move the claim is ABOUT (alt note -> that
+            # alt's refutation line; main annotation -> the master line).
+            uci = claim.alt_uci or move.uci
+            line = (move.legal_evals.get(uci) or {}).get("refutation_pv") or []
+            mat = facts.line_material(move.fen_before, uci, line)
             if not mat.captures:
                 errors.append(ValidationError(
                     game_id, move.ply, "unsupported_material_claim",
-                    f"{where}: master line shows no capture"))
+                    f"{where}: the line for {uci} shows no capture"))
 
         elif kind == "castling_inability":
             rights = facts.opponent_castling_rights(move.fen_before, move.uci)
