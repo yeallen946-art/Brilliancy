@@ -62,8 +62,14 @@ targets:
     deploymentTarget: "17.0"
     sources:
       - path: Tests
+      # StoreKit catalog bundled INTO the test target so SKTestSession can load it
+      # (the scheme-level storeKitConfiguration only applies to the Run action —
+      # that's why the issue-#9 CLI probe failed with SKInternalErrorDomain 3).
+      - path: Brilliancy.storekit
+        buildPhase: resources
     dependencies:
       - target: Brilliancy
+      - sdk: StoreKitTest.framework
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
