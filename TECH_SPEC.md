@@ -236,6 +236,20 @@ The naive design — "LLM writes chess claims from its own knowledge, validator 
 
 - **Human review stays the gate for the curated MVP.** For ~50 games, the 1700 reviewer (Jerry's son) catches exactly the interpretive/semantic errors no automated check will (he found the "two bishops" error the engine couldn't). Automation above is what makes annotation *scale* beyond what a human can review; it does not replace human review of the launch set.
 
+### 5.2 Claim taxonomy + audit pass (close the blacklist gap)
+
+§5.1 fixed *generation* (whitelist: narrate supplied facts only) but left *verification* a blacklist: `5_validate` checks the claim patterns we have enumerated so far, and any claim TYPE not yet enumerated sails through. Every incident so far is this one hole: piece-credit at mate ("two bishops", 2026-06), spoiling still-unguessed moves ("the rook mates next"), and over-claiming king safety ("stuck in the center" while both castling rights remain) were each *novel claim classes*, patched reactively. Two structural causes:
+
+1. **Whitelist generation, blacklist verification.** Prose is unrestricted natural language; unenumerated claim types are unchecked by construction.
+2. **Product-timeline constraints weren't in the contract.** A guessing trainer has an information timeline — at guess point N the user must not learn the answers to N+1... The spoiler prose was chess-factually TRUE; no pipeline stage represented the product rule it broke.
+
+**Fix: a closed claim taxonomy + an extraction audit (`audit.py`, CLI `5b_audit.py`).** Every claim an annotation may make belongs to a class that is exactly one of: **F** fact-backed (has a `facts.py` extractor + deterministic check), **I** interpretive (allowed; eval-direction-checked only), or **B** banned (e.g. identifying a still-unguessed master move; game identity). The audit pass uses a *separate* LLM call to EXTRACT every claim in the prose into this taxonomy (extraction is far more reliable than generation honesty, and it isn't self-grading), then deterministic code verifies each extracted claim against `facts.py`. A claim the extractor cannot classify → `unclassified_claim` → human review AND a taxonomy decision (new class with a checker, declared interpretive, or banned) — **the taxonomy must grow before the prose ships, never after**. This turns "new error class" from a shipped-content incident into a build-time failure.
+
+Operating rules:
+- `5_validate` (deterministic, keyless) remains the hard gate; `5b_audit` (needs API key) is required for content shipping but skippable for code-only CI.
+- Review HTML prints the per-point FACT SHEET (eval, PV, castling rights, mate pattern, captures, motifs, still-to-guess list) next to the prose, so the human reviewer verifies against printed ground truth rather than memory.
+- The annotate prompt carries the same taxonomy boundaries (SPOILER GUARD, castling-bounded king-safety language, mate-piece credit) so generation rarely produces what the audit would reject.
+
 ## 6. Monetization Implementation
 
 - StoreKit 2, products: `sub.monthly` ($4.99), `sub.annual` ($29.99, 7-day trial), `lifetime` ($49.99 non-consumable).

@@ -286,6 +286,89 @@ def test_move_prompt_carries_castling_fact():
     assert "kingside and queenside" in prompt
 
 
+# ---------------------------------------------------------------------- audit (5b)
+
+def _claim(cls, quote, piece=None):
+    from audit import ExtractedClaim
+    return ExtractedClaim(claim_class=cls, quote=quote, piece=piece)
+
+
+def _audit_move(annotation="x", legal_evals=None, fen=None):
+    return MoveRecord(
+        ply=20, san="e4", uci="e2e4", fen_before=fen or START_FEN, mover="white",
+        is_guess_point=True, annotation=annotation,
+        legal_evals=legal_evals or {"e2e4": {"cp": 30}},
+    )
+
+
+def test_audit_unclassified_claim_fails():
+    from audit import check_claims
+    errors = check_claims("g", _audit_move(), [_claim("other", "weird claim")], [])
+    assert [e.code for e in errors] == ["unclassified_claim"]
+
+
+def test_audit_future_identifying_is_spoiler_only_when_upcoming():
+    from audit import check_claims
+    claims = [_claim("future_identifying", "the rook mates next")]
+    assert [e.code for e in check_claims("g", _audit_move(), claims, ["Rd8#"])] == ["spoils_future_guess"]
+    assert check_claims("g", _audit_move(), claims, []) == []
+
+
+def test_audit_mate_claims_checked_against_board():
+    from audit import check_claims
+    # Fool's mate position: Qh4# is mate; e2e4 is not.
+    fools = "rnbqkbnr/pppp1ppp/8/4p3/6P1/5P2/PPPPP2P/RNBQKBNR b KQkq - 0 2"
+    mate_move = MoveRecord(
+        ply=4, san="Qh4#", uci="d8h4", fen_before=fools, mover="black",
+        is_guess_point=True, annotation="x",
+        legal_evals={"d8h4": {"cp": None, "mate": 1}},
+    )
+    assert check_claims("g", mate_move, [_claim("mate_now", "delivers mate", piece="queen")], []) == []
+    errs = check_claims("g", mate_move, [_claim("mate_now", "the rook mates", piece="rook")], [])
+    assert [e.code for e in errs] == ["wrong_mating_pieces"]
+    errs = check_claims("g", _audit_move(), [_claim("mate_now", "mate on the spot")], [])
+    assert [e.code for e in errs] == ["unsupported_mate_claim"]
+
+
+def test_audit_mate_forced_needs_engine_mate():
+    from audit import check_claims
+    no_mate = _audit_move()
+    assert [e.code for e in check_claims("g", no_mate, [_claim("mate_forced", "forces mate")], [])] \
+        == ["unsupported_mate_claim"]
+    with_mate = _audit_move(legal_evals={"e2e4": {"cp": None, "mate": 3}})
+    assert check_claims("g", with_mate, [_claim("mate_forced", "forces mate")], []) == []
+
+
+def test_audit_material_and_castling_and_motif():
+    from audit import check_claims
+    move = _audit_move()  # 1.e4 from start: no captures, opponent castles fine, no motifs
+    claims = [
+        _claim("material", "wins a pawn"),
+        _claim("castling_inability", "king stuck in the center"),
+        _claim("tactic_motif", "a deadly fork"),
+    ]
+    codes = sorted(e.code for e in check_claims("g", move, claims, []))
+    assert codes == ["unsupported_material_claim", "unsupported_motif_claim",
+                     "unsupported_stuck_king_claim"]
+
+
+def test_audit_interpretive_claims_pass():
+    from audit import check_claims
+    claims = [_claim("eval_verdict", "White is better"),
+              _claim("positional_color", "smooth development")]
+    assert check_claims("g", _audit_move(), claims, []) == []
+
+
+def test_audit_prompt_contains_prose_and_upcoming():
+    from audit import build_audit_prompt
+    move = _audit_move(annotation="A fine central move.")
+    move.alt_annotations = {"d2d4": "Also reasonable."}
+    prompt = build_audit_prompt(move, ["Rd1"])
+    assert "A fine central move." in prompt
+    assert "Rd1" in prompt
+    assert "Also reasonable." in prompt
+
+
 def test_unshippable_reasons():
     g = _approved_game()
     assert build.unshippable_reasons(g) == []

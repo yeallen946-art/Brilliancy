@@ -12,6 +12,7 @@ import html
 import chess
 import chess.svg
 
+import facts
 from store import GameRecord, MoveRecord
 
 _STYLE = """
@@ -22,6 +23,8 @@ _STYLE = """
  .note { flex: 1; }
  .intro { font-style: italic; color: #555; }
  .alt { color: #444; font-size: 0.95em; }
+ .facts { color: #246; font-size: 0.9em; background: #eef4fb; padding: .4rem .6rem; border-radius: 6px; }
+ .spoiler-check { color: #832; font-size: 0.9em; }
  h3 { margin: 0 0 .4rem; }
 </style>
 """
@@ -36,6 +39,33 @@ def _san(fen_before: str, uci: str) -> str:
         return chess.Board(fen_before).san(chess.Move.from_uci(uci))
     except (ValueError, AssertionError):
         return uci
+
+
+def _fact_sheet(move: MoveRecord) -> str:
+    """One-line computed ground truth for the reviewer (TECH_SPEC §5.2)."""
+    entry = move.legal_evals.get(move.uci) or {}
+    bits: list[str] = []
+    if entry.get("mate") is not None:
+        bits.append(f"eval #{entry['mate']:+d}")
+    elif entry.get("cp") is not None:
+        bits.append(f"eval {entry['cp'] / 100:+.2f}")
+    pv = entry.get("refutation_pv") or []
+    if pv:
+        bits.append("PV: " + " ".join(pv[:4]))
+    rights = facts.opponent_castling_rights(move.fen_before, move.uci)
+    if rights is not None:
+        sides = [s for s, ok in (("K", rights["kingside"]), ("Q", rights["queenside"])) if ok]
+        bits.append("opponent castling: " + ("+".join(sides) if sides else "NONE"))
+    mat = facts.line_material(move.fen_before, move.uci, pv)
+    if mat.captures:
+        bits.append(f"captures in line: {', '.join(mat.captures)} (net {mat.net_pawns:+d})")
+    motifs = facts.tactical_motifs(move.fen_before, move.uci)
+    if motifs:
+        bits.append("motifs: " + ", ".join(motifs))
+    pattern = facts.mate_pattern(move.fen_before, move.uci)
+    if pattern.is_mate:
+        bits.append(f"MATE by {', '.join(pattern.checkers)}; cover: {', '.join(pattern.supporters) or 'none'}")
+    return " · ".join(bits) or "(no engine data)"
 
 
 def _board_svg(move: MoveRecord) -> str:
@@ -72,6 +102,9 @@ def render_game_html(game: GameRecord) -> str:
         if still:
             parts.append(f"<p class='spoiler-check'><b>Still to guess after this:</b> {still} "
                          "— the annotation must not give these away.</p>")
+        # FACT SHEET (TECH_SPEC §5.2): the reviewer verifies prose against printed
+        # ground truth, not memory.
+        parts.append(f"<p class='facts'><b>Facts:</b> {_esc(_fact_sheet(move))}</p>")
         parts.append(f"<p>{_esc(move.annotation or '(no annotation yet)')}</p>")
         if move.alt_annotations:
             parts.append("<div class='alt'><b>Alternatives:</b><ul>")
