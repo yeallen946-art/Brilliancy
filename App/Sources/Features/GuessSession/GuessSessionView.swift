@@ -150,10 +150,12 @@ struct GuessSessionView: View {
         HStack(spacing: Theme.Space.xs) {
             Text(eval.band.icon).font(.title2.weight(.medium))
             Text(eval.label).font(.system(size: 17, weight: .medium))
-            if !eval.isMatch && eval.evalDeltaCp > 0 {
-                Text(String(format: "(-%.1f)", Double(eval.evalDeltaCp) / 100.0))
-                    .font(.system(size: 13)).foregroundStyle(Theme.textSecondary)
-            }
+            // Points earned, same unit as the summary score. (Previously this slot
+            // showed the raw eval delta in pawns, which read as a points deduction —
+            // and mate-clamped evals made it "(-297.0)". The pawn story now lives in
+            // the wrong-guess card, where it's mate-aware.)
+            Text("+\(eval.displayPoints)")
+                .font(.system(size: 13, weight: .medium))
         }
         .padding(.vertical, Theme.Space.xs).padding(.horizontal, Theme.Space.md)
         .background(bandColor(eval.band).opacity(0.18), in: Capsule())
