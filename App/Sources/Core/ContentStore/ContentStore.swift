@@ -36,6 +36,35 @@ enum ContentStore {
         }
     }
 
+    /// Load pack metadata (S5/S6). [] when the bundle has no DB / no packs.
+    static func bundledPacks() -> [ContentPack] {
+        guard let url = Bundle.main.url(forResource: "content", withExtension: "sqlite") else {
+            return []
+        }
+        do {
+            var config = Configuration()
+            config.readonly = true
+            let dbQueue = try DatabaseQueue(path: url.path, configuration: config)
+            return try dbQueue.read { db in try packs(in: db) }
+        } catch {
+            return []
+        }
+    }
+
+    static func packs(in db: Database) throws -> [ContentPack] {
+        let rows = try Row.fetchAll(db, sql: "SELECT * FROM packs ORDER BY sort_order, id")
+        return rows.map { row in
+            ContentPack(
+                id: row["id"],
+                name: row["name"] ?? row["id"],
+                kind: row["kind"] ?? "theme",
+                description: row["description"] ?? "",
+                priceTier: row["price_tier"] ?? "premium",
+                sortOrder: row["sort_order"] ?? 0
+            )
+        }
+    }
+
     /// Core reader, separated from the bundle lookup so tests can run it against an
     /// in-memory database with the same schema.
     static func games(in db: Database) throws -> [GameContent] {
@@ -50,6 +79,7 @@ enum ContentStore {
             let moves = moveRows.map(contentMove(from:))
             let heroColor: String? = gameRow["hero_color"]
             return GameContent(
+                packId: gameRow["pack_id"],
                 id: id,
                 white: gameRow["white"] ?? "Unknown",
                 black: gameRow["black"] ?? "Unknown",

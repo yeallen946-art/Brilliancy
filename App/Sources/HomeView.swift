@@ -52,6 +52,8 @@ struct HomeView: View {
                             .padding(.top, Theme.Space.lg)
                     }
                     .padding(Theme.Space.md)
+                    .frame(maxWidth: Theme.contentMaxWidth)
+                    .frame(maxWidth: .infinity)
                 }
             }
             .navigationTitle("Brilliancy")

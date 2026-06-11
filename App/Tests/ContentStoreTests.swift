@@ -24,12 +24,21 @@ final class ContentStoreTests: XCTestCase {
                     annotation_zh TEXT, alt_annotations_zh TEXT,
                     PRIMARY KEY (game_id, ply)
                 );
+                CREATE TABLE packs (
+                    id TEXT PRIMARY KEY, name TEXT, kind TEXT, description TEXT,
+                    price_tier TEXT, sort_order INTEGER
+                );
                 """)
             try db.execute(
                 sql: """
                 INSERT INTO games VALUES
                 ('g1', 'White, W.', 'Black, B.', 'Test', 1910, '1-0', 'B15',
-                 'white', 'Test Game', 'An intro.', NULL, 2, NULL, NULL)
+                 'white', 'Test Game', 'An intro.', 'p1', 2, NULL, NULL)
+                """)
+            try db.execute(
+                sql: """
+                INSERT INTO packs VALUES
+                ('p1', 'Test Pack', 'theme', 'A pack.', 'premium', 0)
                 """)
             try db.execute(
                 sql: """
@@ -59,6 +68,7 @@ final class ContentStoreTests: XCTestCase {
         XCTAssertEqual(game.title, "Test Game")
         XCTAssertEqual(game.heroColor, .white)
         XCTAssertEqual(game.heroDisplayName, "White")
+        XCTAssertEqual(game.packId, "p1")
         XCTAssertEqual(game.moves.count, 2)
         XCTAssertEqual(game.startFen, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
         XCTAssertEqual(game.guessPointCount, 1)
@@ -103,6 +113,16 @@ final class ContentStoreTests: XCTestCase {
         // Non-guess-point rows carry no candidate data.
         XCTAssertTrue(games.first!.moves[0].altAnnotations.isEmpty)
         XCTAssertTrue(games.first!.moves[0].candidateDetails.isEmpty)
+    }
+
+    func testLoadsPacks() throws {
+        let packs = try makeDb().read { try ContentStore.packs(in: $0) }
+        XCTAssertEqual(packs.count, 1)
+        let pack = try XCTUnwrap(packs.first)
+        XCTAssertEqual(pack.id, "p1")
+        XCTAssertEqual(pack.name, "Test Pack")
+        XCTAssertEqual(pack.kind, "theme")
+        XCTAssertEqual(pack.priceTier, "premium")
     }
 
     func testJsonHelpersTolerateGarbage() {

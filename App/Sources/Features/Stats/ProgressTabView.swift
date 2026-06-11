@@ -17,6 +17,8 @@ struct ProgressTabView: View {
                         .blur(radius: entitlements.isPremium ? 0 : 6)
                         .allowsHitTesting(entitlements.isPremium)
                         .padding(Theme.Space.md)
+                        .frame(maxWidth: Theme.contentMaxWidth)
+                        .frame(maxWidth: .infinity)
                 }
                 if !entitlements.isPremium {
                     lockCard

@@ -286,6 +286,30 @@ def test_move_prompt_carries_castling_fact():
     assert "kingside and queenside" in prompt
 
 
+# ----------------------------------------------------------------------- packs (S6)
+
+def test_build_packs_table_and_pack_assignment(tmp_path):
+    import sqlite3
+    game = _approved_game()
+    game.pack_id = "immortal-classics"
+    packs = [{"id": "immortal-classics", "name": "Immortal Classics", "kind": "theme",
+              "description": "d", "price_tier": "premium", "sort_order": 0}]
+    db = os.path.join(tmp_path, "c.sqlite")
+    build.build_sqlite([game], db, packs=packs)
+    conn = sqlite3.connect(db)
+    try:
+        row = conn.execute("SELECT id, name, kind, price_tier FROM packs").fetchone()
+        assert row == ("immortal-classics", "Immortal Classics", "theme", "premium")
+        pack_id, = conn.execute("SELECT pack_id FROM games").fetchone()
+        assert pack_id == "immortal-classics"
+    finally:
+        conn.close()
+
+
+def test_load_packs_missing_file_is_empty(tmp_path):
+    assert store.load_packs(os.path.join(tmp_path, "nope.json")) == []
+
+
 # ----------------------------------------------------------- zh narration (PRD 12.1)
 
 def test_zh_prompt_carries_terminology_and_language_directive():

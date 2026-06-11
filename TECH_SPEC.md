@@ -280,6 +280,6 @@ Render offscreen SwiftUI view → UIImage: app name, date, score band (emoji row
 
 ## 10. Out of Scope (V1)
 
-Backend/auth, Android, any on-device engine (everything is precomputed — `legal_evals` covers every legal move at each guess point, so there is no "unknown move" case), localization, iPad-optimized layout (runs scaled), Game Center.
+Backend/auth, Android, any on-device engine (everything is precomputed — `legal_evals` covers every legal move at each guess point, so there is no "unknown move" case), Game Center. (Formerly listed here but since pulled INTO scope by the owner: Chinese localization — PRD §12, pipeline is bilingual; iPad — native target since V1.1, centered-column layout, full-screen only.)
 
 **Edge case — illegal/non-legal input:** the BoardView only allows legal moves, so every guess is in `legal_evals`. The only "missing" case is a guess at a non-guess-point (can't happen — UI only prompts at guess points). Never run an engine on device in V1.

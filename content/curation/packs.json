@@ -1,0 +1,14 @@
+[
+  {
+    "id": "immortal-classics",
+    "name": "Immortal Classics",
+    "kind": "theme",
+    "description": "The most celebrated attacking masterpieces in chess history.",
+    "price_tier": "premium",
+    "sort_order": 0,
+    "game_ids": [
+      "morphy-isouard-1858-f7f676",
+      "reti-tartakower-1910-2d0490"
+    ]
+  }
+]

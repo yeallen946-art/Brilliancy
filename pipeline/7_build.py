@@ -48,6 +48,16 @@ def main() -> int:
             print(f"{g.id}: guess points refined — dropped plies {changes['dropped']}, "
                   f"added {changes['added']}")
 
+    # Packs (S5/S6): tracked curation file assigns membership; in-memory like the
+    # refinement so the work store stays untouched.
+    packs = store.load_packs()
+    pack_by_game = {gid: p["id"] for p in packs for gid in p.get("game_ids", [])}
+    for g in games:
+        g.pack_id = pack_by_game.get(g.id, g.pack_id)
+    if packs:
+        print(f"Packs: {', '.join(p['id'] for p in packs)} "
+              f"({len(pack_by_game)} game assignment(s)).")
+
     # Safety gate 1: no empty / partly-annotated games may ship (reviewer guard, A/D).
     blockers = [(g.id, r) for g in games for r in [unshippable_reasons(g)] if r]
     if blockers:
@@ -61,7 +71,7 @@ def main() -> int:
         print(f"Refusing to build: {len(errors)} validation error(s). Run 5_validate.py.")
         return 1
 
-    build_sqlite(games, args.db)
+    build_sqlite(games, args.db, packs=packs)
     print(f"Built {args.db} from {len(games)} game(s).")
 
     # Copy into the app bundle location (App/Resources/) — the app reads this via

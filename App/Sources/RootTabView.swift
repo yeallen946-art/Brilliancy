@@ -8,6 +8,13 @@ struct RootTabView: View {
     @State private var userStore = UserStore.onDisk()
     @State private var entitlements = EntitlementStore()
 
+    /// S10: shown once on first launch. UI tests that aren't about onboarding pass
+    /// -skipOnboarding to keep their flows stable.
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    private var skipOnboarding: Bool {
+        ProcessInfo.processInfo.arguments.contains("-skipOnboarding")
+    }
+
     var body: some View {
         TabView {
             HomeView(userStore: userStore)
@@ -19,6 +26,12 @@ struct RootTabView: View {
         }
         .environment(entitlements)
         .task { await entitlements.start() }
+        .fullScreenCover(isPresented: Binding(
+            get: { !hasCompletedOnboarding && !skipOnboarding },
+            set: { showing in if !showing { hasCompletedOnboarding = true } }
+        )) {
+            OnboardingView { hasCompletedOnboarding = true }
+        }
         .preferredColorScheme(.dark)
         .tint(Theme.gold)
     }

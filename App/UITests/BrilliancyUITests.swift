@@ -14,6 +14,7 @@ final class BrilliancyUITests: XCTestCase {
 
     func testLaunchToGuessSession() {
         let app = XCUIApplication()
+        app.launchArguments += ["-skipOnboarding"]
         app.launch()
 
         // Home screen: the primary CTA exists.

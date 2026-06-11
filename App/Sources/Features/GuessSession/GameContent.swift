@@ -4,6 +4,9 @@ import Foundation
 /// Swift literal (`SampleGames`); in M2 the pipeline builds it into content.sqlite and
 /// the app decodes equivalent rows (TECH_SPEC §4). Kept deliberately close to the DB shape.
 struct GameContent: Identifiable {
+    /// Pack membership (S5/S6); nil for unpacked games. Declared first so the
+    /// memberwise init keeps existing call sites (which omit it) unchanged.
+    var packId: String? = nil
     let id: String
     let white: String
     let black: String
@@ -92,6 +95,16 @@ struct CandidateDetail: Equatable {
     let san: String?
     let refutationSan: [String]
     let motif: String?
+}
+
+/// Pack metadata (S5/S6, TECH_SPEC §4 packs table).
+struct ContentPack: Identifiable {
+    let id: String
+    let name: String
+    let kind: String          // player | theme | daily_archive
+    let description: String
+    let priceTier: String     // free | premium (display only; gating stays per-game)
+    let sortOrder: Int
 }
 
 /// Weakness-breakdown tags (TECH_SPEC §3.3).

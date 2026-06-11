@@ -45,6 +45,11 @@ enum Theme {
         static let button: CGFloat = 12
         static let board: CGFloat = 6
     }
+
+    /// V1.1 iPad adaptation: content columns cap at this width and center, so the
+    /// app renders natively on iPad without stretching cards across the screen.
+    /// (A true side-by-side board+cards layout is a later refinement.)
+    static let contentMaxWidth: CGFloat = 700
 }
 
 extension Color {

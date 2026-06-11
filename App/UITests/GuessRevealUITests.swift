@@ -23,6 +23,7 @@ final class GuessRevealUITests: XCTestCase {
 
     func testWrongGuessShowsExplanationCardAndPointsBanner() {
         let app = XCUIApplication()
+        app.launchArguments += ["-skipOnboarding"]
         app.launch()
 
         // Train tab -> the Opera game (deterministic content, first guess point at
@@ -73,7 +74,7 @@ final class GuessRevealUITests: XCTestCase {
     /// launch argument: master e4 (+0.30) with Nf3 tied at +0.25.
     func testEngineEqualGuessShowsPositiveCard() {
         let app = XCUIApplication()
-        app.launchArguments += ["-uiTestEqualGuessFixture"]
+        app.launchArguments += ["-uiTestEqualGuessFixture", "-skipOnboarding"]
         app.launch()
 
         app.tabBars.buttons["Train"].tap()

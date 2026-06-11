@@ -144,6 +144,20 @@ def record_decision(game_id: str, status: str, path: str = DECISIONS_FILE) -> No
         json.dump(decisions, fh, indent=2, sort_keys=True)
 
 
+# ------------------------------------------------------------------ pack curation
+# Tracked pack definitions (S5/S6): {id, name, kind, description, price_tier,
+# sort_order, game_ids}. 7_build assigns game.pack_id from game_ids membership.
+
+PACKS_FILE = os.path.join(CURATION_DIR, "packs.json")
+
+
+def load_packs(path: str = PACKS_FILE) -> list[dict]:
+    if not os.path.exists(path):
+        return []
+    with open(path, encoding="utf-8") as fh:
+        return json.load(fh)
+
+
 # ---------------------------------------------------------------- curation selection
 
 SELECTED_FILE = os.path.join(CURATION_DIR, "selected.txt")

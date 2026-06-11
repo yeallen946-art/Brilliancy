@@ -39,6 +39,8 @@ struct GuessSessionView: View {
                 Spacer(minLength: 0)
             }
             .padding(Theme.Space.md)
+            .frame(maxWidth: Theme.contentMaxWidth)
+            .frame(maxWidth: .infinity)
             .animation(.default, value: model.phase)
         }
         .preferredColorScheme(.dark)
