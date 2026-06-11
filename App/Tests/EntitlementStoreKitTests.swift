@@ -35,27 +35,43 @@ final class EntitlementStoreKitTests: XCTestCase {
         try session?.clearTransactions()
     }
 
+    /// SKTestSession transactions propagate to `Transaction.currentEntitlements`
+    /// asynchronously (the first CI run proved it: the post-buy check ran too early
+    /// and the post-clear check then saw the STALE purchase). Poll until the store
+    /// reaches the expected state or time out.
+    private func waitForPremium(
+        _ store: EntitlementStore, toBe expected: Bool, timeout: TimeInterval = 15
+    ) async -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            await store.refreshEntitlements()
+            if store.isPremium == expected { return true }
+            try? await Task.sleep(nanoseconds: 200_000_000)
+        }
+        return store.isPremium == expected
+    }
+
     func testLifetimePurchaseUnlocksPremiumAndClearingRevokesIt() async throws {
         let store = EntitlementStore()
 
-        await store.refreshEntitlements()
-        XCTAssertFalse(store.isPremium, "fresh session must start free")
+        let startsFree = await waitForPremium(store, toBe: false)
+        XCTAssertTrue(startsFree, "fresh session must start free")
 
         _ = try await session.buyProduct(productIdentifier: "lifetime")
-        await store.refreshEntitlements()
-        XCTAssertTrue(store.isPremium, "lifetime purchase must unlock premium")
+        let unlocked = await waitForPremium(store, toBe: true)
+        XCTAssertTrue(unlocked, "lifetime purchase must unlock premium")
 
         try session.clearTransactions()
-        await store.refreshEntitlements()
-        XCTAssertFalse(store.isPremium, "clearing transactions must return to free")
+        let revoked = await waitForPremium(store, toBe: false)
+        XCTAssertTrue(revoked, "clearing transactions must return to free")
     }
 
     func testAnnualSubscriptionUnlocksPremium() async throws {
         let store = EntitlementStore()
 
         _ = try await session.buyProduct(productIdentifier: "sub.annual")
-        await store.refreshEntitlements()
-        XCTAssertTrue(store.isPremium, "annual subscription must unlock premium")
+        let unlocked = await waitForPremium(store, toBe: true)
+        XCTAssertTrue(unlocked, "annual subscription must unlock premium")
     }
 
     func testProductCatalogLoads() async throws {
