@@ -11,10 +11,11 @@ iOS chess training app: the user replays famous master games and guesses the mas
 ## Repo layout
 
 ```
-App/        # Xcode project, SwiftUI app (see TECH_SPEC §3 for module map)
-pipeline/   # Python content pipeline (see TECH_SPEC §5)
-content/    # PGN sources, curation lists, review state, built artifacts (gitignored: *.sqlite)
-docs/       # PRD.md, TECH_SPEC.md, ROADMAP.md live at repo root or here
+App/         # Xcode project, SwiftUI app (see TECH_SPEC §3 for module map)
+pipeline/    # Python content pipeline (see TECH_SPEC §5)
+content/     # PGN sources, curation lists, review state, built artifacts (gitignored: *.sqlite)
+miniprogram/ # WeChat mini-program client, mainland entry (TECH_SPEC §11, PRD §12)
+docs/        # PRD.md, TECH_SPEC.md, ROADMAP.md live at repo root or here
 ```
 
 ## Commands
@@ -35,6 +36,10 @@ python 4_annotate.py --game-id <id>    # needs ANTHROPIC_API_KEY
 python 5_validate.py --all             # must pass before 7_build.py
 python 7_build.py                      # emits content/content.sqlite + content/daily/*.json
 pytest                                 # pipeline tests
+
+# Mini-program (miniprogram/): open the folder in WeChat DevTools; no build step.
+# Client has ZERO chess engine — legal moves come from legal_evals keys, SAN is
+# precomputed; scoring constants mirror TECH_SPEC §3.2 (sync both on tuning).
 ```
 
 ## Conventions
@@ -42,7 +47,7 @@ pytest                                 # pipeline tests
 - Swift: SwiftUI + Observation (`@Observable`), iOS 17+. No UIKit unless unavoidable; justify in PR. No new SPM dependencies without a one-line justification (current allowlist: ChessKit, GRDB, TelemetryDeck).
 - Scoring and rating math live in `Core/Scoring/` as pure functions with table-driven unit tests. Never inline scoring constants elsewhere — they're in one config struct (`ScoringConfig`).
 - All premium gating goes through `EntitlementStore.isPremium`. Never check StoreKit transactions directly in feature code.
-- User-facing strings: English only (V1), sentence case, coach tone — encouraging, never mocking a wrong guess (PRD §5).
+- User-facing strings: iOS ships English first via String Catalog (i18n-clean per PRD §12.1); the mini-program is Chinese-first. Sentence case, coach tone — encouraging, never mocking a wrong guess (PRD §5).
 - Python: 3.12, type hints, each pipeline stage idempotent and runnable per-game-id.
 - Commits: conventional (`feat:`, `fix:`, `pipeline:`, `content:`). Small PRs per milestone task.
 

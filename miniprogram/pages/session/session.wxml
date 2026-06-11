@@ -1,0 +1,48 @@
+<view class="screen">
+  <!-- 进局首帧 -->
+  <block wx:if="{{phase === 'context'}}">
+    <view class="title">{{title}}</view>
+    <view class="secondary">{{heroLine}}</view>
+    <view class="card secondary">{{intro}}</view>
+  </block>
+
+  <!-- 棋盘(除 context 外常驻) -->
+  <view class="board" wx:if="{{phase !== 'context' || true}}">
+    <view
+      wx:for="{{cells}}"
+      wx:key="square"
+      class="cell {{item.light ? 'light' : 'dark'}} {{selected === item.square ? 'sel' : ''}} {{dests.indexOf(item.square) >= 0 ? 'dest' : ''}} {{emphasis.indexOf(item.square) >= 0 ? 'emph' : ''}}"
+      data-square="{{item.square}}"
+      bindtap="tapCell"
+    >{{item.piece ? glyphs[item.piece] : ''}}</view>
+  </view>
+
+  <block wx:if="{{phase === 'context'}}">
+    <button class="btn-gold" bindtap="begin">开始</button>
+  </block>
+
+  <view wx:if="{{phase === 'autoplay'}}" class="secondary" style="text-align:center;">…</view>
+
+  <view wx:if="{{phase === 'guess'}}" class="secondary" style="text-align:center; margin-top: 16rpx;">
+    {{prompt}}
+  </view>
+
+  <!-- 揭示:计分横幅 + 你的着法卡 + 大师讲解卡 -->
+  <block wx:if="{{phase === 'reveal'}}">
+    <view class="banner band-{{feedback.band}}">
+      {{feedback.label}} <text class="banner-points">{{feedback.points}}</text>
+    </view>
+
+    <view wx:if="{{guessExplain}}" class="card">
+      <view class="caption">你走的是 {{guessExplain.san}}</view>
+      <view class="secondary" style="margin-top: 8rpx;">{{guessExplain.text}}</view>
+    </view>
+
+    <view class="card">
+      <view class="caption gold">大师走的是 {{masterSan}}</view>
+      <view class="secondary" style="margin-top: 8rpx;">{{annotation}}</view>
+    </view>
+
+    <button class="btn-gold" bindtap="next">下一步</button>
+  </block>
+</view>

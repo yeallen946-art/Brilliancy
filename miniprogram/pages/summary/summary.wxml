@@ -1,0 +1,8 @@
+<view class="screen" style="text-align: center;">
+  <view class="caption" style="margin-top: 64rpx;">本局完成</view>
+  <view class="title gold" style="font-size: 88rpx;">{{score}}</view>
+  <view style="font-size: 40rpx; letter-spacing: 4rpx;">{{bandRow}}</view>
+
+  <button class="btn-gold" open-type="share">分享成绩</button>
+  <button class="btn-gold" style="background: #1b222b; color: #ecf0f4;" bindtap="backToToday">返回今日</button>
+</view>

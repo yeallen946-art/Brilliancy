@@ -1,0 +1,44 @@
+/* 棋盘:8x8 flex 网格,Chess.com 绿白配色(UI_FLOW §4.1) */
+.board {
+  display: flex;
+  flex-wrap: wrap;
+  width: 686rpx;
+  height: 686rpx;
+  margin: 16rpx auto;
+  border-radius: 12rpx;
+  overflow: hidden;
+}
+
+.cell {
+  width: 12.5%;
+  height: 12.5%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 56rpx;
+  line-height: 1;
+}
+
+.cell.light { background: #ebecd0; }
+.cell.dark  { background: #769656; }
+
+/* 选中 / 可走点 / 揭示强调:全格淡黄罩层(同 iOS 范式) */
+.cell.sel   { background: #f5f682; }
+.cell.dest  { box-shadow: inset 0 0 0 8rpx rgba(0, 0, 0, 0.16); }
+.cell.light.emph { background: #f5f682; }
+.cell.dark.emph  { background: #b9ca43; }
+
+.banner {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12rpx;
+  padding: 16rpx;
+  border-radius: 48rpx;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 32rpx;
+  font-weight: 500;
+  margin: 16rpx 0;
+}
+
+.banner-points { font-size: 26rpx; margin-left: 12rpx; }

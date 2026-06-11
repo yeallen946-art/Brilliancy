@@ -283,3 +283,16 @@ Render offscreen SwiftUI view → UIImage: app name, date, score band (emoji row
 Backend/auth, Android, any on-device engine (everything is precomputed — `legal_evals` covers every legal move at each guess point, so there is no "unknown move" case), Game Center. (Formerly listed here but since pulled INTO scope by the owner: Chinese localization — PRD §12, pipeline is bilingual; iPad — native target since V1.1, centered-column layout, full-screen only.)
 
 **Edge case — illegal/non-legal input:** the BoardView only allows legal moves, so every guess is in `legal_evals`. The only "missing" case is a guess at a non-guess-point (can't happen — UI only prompts at guess points). Never run an engine on device in V1.
+
+## 11. WeChat Mini-Program Client (`miniprogram/`, PRD §12)
+
+The mainland-China entry point, run by Jerry's company entity. Native WXML/WXSS/JS, zero build chain, zero third-party deps. Same architectural hard lines as iOS: **no chess engine on the client, no runtime LLM calls, everything precomputed.**
+
+- **Content**: fetches the SAME daily JSON the iOS app uses (`utils/content.js`), reading the `_zh` keys; storage-cache fallback. Dev points at GitHub Pages (devtools "skip domain check"); production MUST point at the 备案 domain — one `BASE_URL` constant.
+- **No engine, provably**: legal moves at a guess point = the keys of `legal_evals` (pipeline enumerates all of them); move application is mechanical UCI piece-shuffling (castle = king moves two files → move the rook; en passant = pawn moves diagonally to an empty square → remove the bypassed pawn; promotion = 5th UCI char). SAN is never generated client-side — `san`/`refutation_san` are precomputed by the pipeline. This keeps hard rule #5's correctness surface entirely server-side.
+- **Scoring** (`utils/scoring.js`): pure-function port of §3.2 including mate clamping, master-match floor, engine-top tolerance, and band flags. The constants' single source of truth is the §3.2 table — any tuning changes BOTH `ScoringConfig` and this file.
+- **Reveal logic**: zh port of the 3-case GuessExplainer (match → merged card; engine-equal/beat → praise; worse → shortfall), preferring `alt_annotations_zh` prose, falling back to an engine-numbers-only zh template. No freestyle commentary (hard rule #1).
+- **Share**: `onShareAppMessage` with score + emoji band row only — never move spoilers (§7's rule, WeChat-native form).
+- **Not built yet** (ordered backlog in `miniprogram/README.md`): local streak/results storage, archive + virtual payments (post-2026-02 Apple–Tencent deal, 15% cut), cburnett piece images (Unicode glyphs for now), service-notification re-engagement, subpackage loading.
+
+Timeline per PRD §12.6: ships after the overseas TestFlight validates the core loop; 备案 runs in parallel.

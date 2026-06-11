@@ -1,0 +1,13 @@
+{
+  "description": "Brilliancy 微信小程序(大陆主入口,PRD §12)。appid 为占位:导入微信开发者工具后改为公司小程序的 appid。",
+  "appid": "touristappid",
+  "compileType": "miniprogram",
+  "libVersion": "3.7.0",
+  "setting": {
+    "es6": true,
+    "postcss": false,
+    "minified": true,
+    "urlCheck": true
+  },
+  "projectname": "brilliancy-miniprogram"
+}

@@ -1,0 +1,17 @@
+{
+  "pages": [
+    "pages/today/today",
+    "pages/session/session",
+    "pages/summary/summary"
+  ],
+  "window": {
+    "navigationBarBackgroundColor": "#0F141A",
+    "navigationBarTextStyle": "white",
+    "navigationBarTitleText": "Brilliancy",
+    "backgroundColor": "#0F141A",
+    "backgroundTextStyle": "light"
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents"
+}

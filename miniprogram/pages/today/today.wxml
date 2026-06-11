@@ -1,0 +1,16 @@
+<view class="screen">
+  <view wx:if="{{loading}}" class="card secondary">正在加载今日对局…</view>
+
+  <view wx:elif="{{failed}}" class="card">
+    <view class="secondary">加载失败,请检查网络。</view>
+    <button class="btn-gold" bindtap="retry">重试</button>
+  </view>
+
+  <block wx:else>
+    <view class="caption">今日对局</view>
+    <view class="title">{{title}}</view>
+    <view class="secondary">{{subtitle}}</view>
+    <view class="card secondary" style="margin-top: 24rpx;">{{intro}}</view>
+    <button class="btn-gold" bindtap="start">开始猜棋</button>
+  </block>
+</view>
