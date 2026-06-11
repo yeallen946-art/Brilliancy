@@ -14,6 +14,7 @@ import shutil
 
 import store
 from build import build_sqlite, daily_date_or_none, unshippable_reasons, write_daily
+from guesspoints import apply_refinement
 from validate import validate_game
 
 
@@ -39,6 +40,13 @@ def main() -> int:
     if not games:
         print("No games to build (need approved + selected games, or pass --all).")
         return 1
+
+    # School-2 pacing (PRD §5): drop only-move guess points; tracked overrides win.
+    for g in games:
+        changes = apply_refinement(g)
+        if changes["dropped"] or changes["added"]:
+            print(f"{g.id}: guess points refined — dropped plies {changes['dropped']}, "
+                  f"added {changes['added']}")
 
     # Safety gate 1: no empty / partly-annotated games may ship (reviewer guard, A/D).
     blockers = [(g.id, r) for g in games for r in [unshippable_reasons(g)] if r]

@@ -286,6 +286,56 @@ def test_move_prompt_carries_castling_fact():
     assert "kingside and queenside" in prompt
 
 
+# ------------------------------------------------- guess-point refinement (school 2)
+
+def _gp_move(ply, uci="e2e4", san="e4", evals=None, gp=True):
+    return MoveRecord(
+        ply=ply, san=san, uci=uci, fen_before=START_FEN, mover="white",
+        is_guess_point=gp, annotation="x", legal_evals=evals or {},
+    )
+
+
+def test_is_obvious_point_rules():
+    from guesspoints import is_obvious_point
+    # Big CP gap -> obvious (the Opera Rd1 case).
+    assert is_obvious_point(_gp_move(20, evals={"e2e4": {"cp": 250}, "d2d4": {"cp": -10}}))
+    # Small gap -> a real decision, keep.
+    assert not is_obvious_point(_gp_move(20, evals={"e2e4": {"cp": 250}, "d2d4": {"cp": 180}}))
+    # Mating master move -> NEVER pruned, that's the drama.
+    assert not is_obvious_point(_gp_move(20, evals={"e2e4": {"cp": None, "mate": 2}, "d2d4": {"cp": 90}}))
+    # No engine data / single candidate -> keep (can't judge).
+    assert not is_obvious_point(_gp_move(20, evals={"e2e4": {"cp": 50}}))
+
+
+def test_apply_refinement_prunes_and_overrides():
+    from guesspoints import apply_refinement
+    game = _approved_game()
+    game.moves = [
+        _gp_move(20, evals={"e2e4": {"cp": 250}, "d2d4": {"cp": -10}}),   # obvious -> drop
+        _gp_move(22, evals={"e2e4": {"cp": 100}, "d2d4": {"cp": 60}}),    # keep
+        _gp_move(24, evals={"e2e4": {"cp": 100}, "d2d4": {"cp": 60}}),    # excluded by human
+        _gp_move(26, evals={"e2e4": {"cp": 100}}, gp=False),              # included by human
+    ]
+    changes = apply_refinement(game, overrides={
+        game.id: {"exclude": [24], "include": [26]},
+    })
+    assert changes == {"dropped": [20, 24], "added": [26]}
+    assert [m.ply for m in game.moves if m.is_guess_point] == [22, 26]
+
+
+def test_apply_refinement_include_beats_obvious_and_needs_evals():
+    from guesspoints import apply_refinement
+    game = _approved_game()
+    game.moves = [
+        _gp_move(20, evals={"e2e4": {"cp": 250}, "d2d4": {"cp": -10}}),   # obvious BUT included
+        _gp_move(22, evals={}, gp=False),                                  # include without evals -> no-op
+    ]
+    changes = apply_refinement(game, overrides={game.id: {"include": [20, 22]}})
+    assert changes == {"dropped": [], "added": []}
+    assert game.moves[0].is_guess_point
+    assert not game.moves[1].is_guess_point
+
+
 # ---------------------------------------------------------------------- audit (5b)
 
 def _claim(cls, quote, piece=None):

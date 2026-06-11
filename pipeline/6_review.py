@@ -16,6 +16,7 @@ import argparse
 import os
 
 import store
+from guesspoints import apply_refinement
 from review import render_game_html
 
 REVIEW_DIR = os.path.join(store.CONTENT_DIR, "review")
@@ -61,6 +62,8 @@ def main() -> int:
         if args.all else [store.load_game(args.game_id, args.work_dir)]
     )
     for game in games:
+        # Reviewer sees exactly what ships: same school-2 refinement as 7_build.
+        apply_refinement(game)
         print(f"wrote {_emit(game, args.out_dir)}")
     return 0
 

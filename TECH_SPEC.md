@@ -189,6 +189,11 @@ pipeline/
                   #   - mark guess points: skip book moves (first ~8 plies
                   #     unless novelty), skip forced recaptures, target
                   #     15-30 points/game; difficulty + tag assignment
+                  #   - school-2 refinement (PRD §5, applied at build/review/
+                  #     publish time by guesspoints.apply_refinement): auto-drop
+                  #     only-moves (best-vs-2nd CP gap >= 250, mating moves
+                  #     exempt); tracked per-game overrides in
+                  #     content/curation/guesspoint_overrides.json win last
                   #   depth ~22 or time-budget/pos; multipv=all is cheap
                   #   at moderate depth and is a one-time offline cost
   facts.py        # (lib, see §5.1) deterministic chess-fact extractor:

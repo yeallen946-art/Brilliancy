@@ -22,12 +22,15 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import store
 from build import unshippable_reasons, write_daily
+from guesspoints import apply_refinement
 
 DEFAULT_OUT = os.path.normpath(os.path.join(
     store.REPO_ROOT, "..", "brilliancy-content", "daily"))
 
 
 def shippable(game) -> bool:
+    # Same school-2 refinement as 7_build — the CDN payload matches the bundled DB.
+    apply_refinement(game)
     if game.review_status != store.REVIEW_APPROVED:
         print(f"  ! {game.id}: not approved — skipped", file=sys.stderr)
         return False
