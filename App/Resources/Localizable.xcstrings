@@ -1,7 +1,262 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%arg" : {
 
+    },
+    "%arg %arg/%arg" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$arg %2$arg/%3$arg"
+          }
+        }
+      }
+    },
+    "%arg game%arg · %arg" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$arg game%2$arg · %3$arg"
+          }
+        }
+      }
+    },
+    "%arg to move. What did %arg play?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$arg to move. What did %2$arg play?"
+          }
+        }
+      }
+    },
+    "+%arg" : {
+
+    },
+    "+100" : {
+
+    },
+    "ALL GAMES" : {
+
+    },
+    "About" : {
+
+    },
+    "Account" : {
+
+    },
+    "An AI coach explains why the master's move works — and why yours falls short." : {
+
+    },
+    "Begin" : {
+
+    },
+    "Board sandbox (debug)" : {
+
+    },
+    "Brilliancy" : {
+
+    },
+    "Brilliancy — %arg" : {
+
+    },
+    "Brilliancy — Board Sandbox" : {
+
+    },
+    "Chess board" : {
+
+    },
+    "Copy current" : {
+
+    },
+    "Daily reminder" : {
+
+    },
+    "Done" : {
+
+    },
+    "Enable notifications for Brilliancy in iOS Settings to get the daily reminder." : {
+
+    },
+    "Enjoyed today's game? The full library unlocks more master games like this, with AI insights on every move." : {
+
+    },
+    "Explore the library" : {
+
+    },
+    "FEN" : {
+
+    },
+    "GUESS RATING" : {
+
+    },
+    "Game complete" : {
+
+    },
+    "Guess Rating %arg" : {
+
+    },
+    "Guess the master's move" : {
+
+    },
+    "LIBRARY" : {
+
+    },
+    "Learn from every move" : {
+
+    },
+    "Load FEN" : {
+
+    },
+    "Loading plans…" : {
+
+    },
+    "Master played %arg" : {
+
+    },
+    "Match!" : {
+
+    },
+    "Move %arg" : {
+
+    },
+    "Next" : {
+
+    },
+    "No games available — check your connection." : {
+
+    },
+    "No games available." : {
+
+    },
+    "Not just right or wrong." : {
+
+    },
+    "Notifications" : {
+
+    },
+    "Notifications are off" : {
+
+    },
+    "OK" : {
+
+    },
+    "One local notification a day when a new challenge is ready. Nothing leaves your device." : {
+
+    },
+    "Outguess the legends." : {
+
+    },
+    "PACKS" : {
+
+    },
+    "Pieces: cburnett by Colin M.L. Burnett · CC BY-SA 3.0" : {
+
+    },
+    "Plan" : {
+
+    },
+    "Play one master game a day and guess the next move yourself." : {
+
+    },
+    "Play today's game" : {
+
+    },
+    "Progress" : {
+
+    },
+    "Rating history and your strengths & weaknesses by theme appear here as you play." : {
+
+    },
+    "Reset" : {
+
+    },
+    "Restore purchases" : {
+
+    },
+    "Score %arg" : {
+
+    },
+    "See how your chess sense is growing" : {
+
+    },
+    "Settings" : {
+
+    },
+    "Share" : {
+
+    },
+    "Side to move: %arg" : {
+
+    },
+    "Start your streak — one brilliant game a day." : {
+
+    },
+    "That didn't go through" : {
+
+    },
+    "The purchase couldn't be completed and you weren't charged. Please try again." : {
+
+    },
+    "Time" : {
+
+    },
+    "Today" : {
+
+    },
+    "Today's game is ready." : {
+
+    },
+    "Train" : {
+
+    },
+    "Unlock" : {
+
+    },
+    "Version" : {
+
+    },
+    "You play %arg (%arg)." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "You play %1$arg (%2$arg)."
+          }
+        }
+      }
+    },
+    "You played %arg" : {
+
+    },
+    "Your guess rating, streaks, and strengths & weaknesses by theme — part of the full library." : {
+
+    },
+    "—" : {
+
+    },
+    "…" : {
+
+    },
+    "▲ +%arg" : {
+
+    },
+    "▼ %arg" : {
+
+    },
+    "✓" : {
+
+    },
+    "🔥" : {
+
+    },
+    "🔥 %arg" : {
+
+    }
   },
   "version" : "1.0"
 }

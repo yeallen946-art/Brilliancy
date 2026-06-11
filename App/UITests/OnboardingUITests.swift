@@ -19,8 +19,7 @@ final class OnboardingUITests: XCTestCase {
             // A previous run of THIS test already completed onboarding on this
             // simulator (the flag persists). The skip path is what other tests use;
             // nothing left to verify here.
-            XCTAssertTrue(app.buttons["playTodayButton"].waitForExistence(timeout: 10),
-                          "without onboarding, Home should be up")
+            XCTAssertTrue(waitForHome(in: app), "without onboarding, Home should be up")
             return
         }
 
@@ -33,7 +32,6 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Today's game is ready."].waitForExistence(timeout: 5))
         next.tap()   // Start
 
-        XCTAssertTrue(app.buttons["playTodayButton"].waitForExistence(timeout: 10),
-                      "finishing onboarding should land on Home")
+        XCTAssertTrue(waitForHome(in: app), "finishing onboarding should land on Home")
     }
 }

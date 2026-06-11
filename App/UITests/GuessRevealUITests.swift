@@ -21,6 +21,23 @@ final class GuessRevealUITests: XCTestCase {
         board.coordinate(withNormalizedOffset: offset).tap()
     }
 
+    private func tapTrainTab(in app: XCUIApplication) {
+        let tabBarButton = app.tabBars.buttons["Train"]
+        if tabBarButton.waitForExistence(timeout: 2) {
+            tabBarButton.tap()
+            return
+        }
+
+        let globalButton = app.buttons["Train"].firstMatch
+        if globalButton.waitForExistence(timeout: 2) {
+            globalButton.tap()
+            return
+        }
+
+        // iPadOS 26 exposes SwiftUI tabs as floating-tab cells, not a classic tab bar.
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.94)).tap()
+    }
+
     func testWrongGuessShowsExplanationCardAndPointsBanner() {
         let app = XCUIApplication()
         app.launchArguments += ["-skipOnboarding"]
@@ -28,7 +45,7 @@ final class GuessRevealUITests: XCTestCase {
 
         // Train tab -> the Opera game (deterministic content, first guess point at
         // move 9 with White to move, white side at the bottom).
-        app.tabBars.buttons["Train"].tap()
+        tapTrainTab(in: app)
         let operaRow = app.buttons
             .containing(NSPredicate(format: "label CONTAINS 'Opera'")).firstMatch
         XCTAssertTrue(operaRow.waitForExistence(timeout: 10), "Opera game row should be listed")
@@ -77,7 +94,7 @@ final class GuessRevealUITests: XCTestCase {
         app.launchArguments += ["-uiTestEqualGuessFixture", "-skipOnboarding"]
         app.launch()
 
-        app.tabBars.buttons["Train"].tap()
+        tapTrainTab(in: app)
         let fixtureRow = app.buttons
             .containing(NSPredicate(format: "label CONTAINS 'Equal Guess'")).firstMatch
         XCTAssertTrue(fixtureRow.waitForExistence(timeout: 10), "fixture game should be listed")

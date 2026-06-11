@@ -17,11 +17,9 @@ final class BrilliancyUITests: XCTestCase {
         app.launchArguments += ["-skipOnboarding"]
         app.launch()
 
-        // Home screen: the primary CTA exists.
-        let playButton = app.buttons["playTodayButton"]
-        XCTAssertTrue(playButton.waitForExistence(timeout: 10), "Play button should be on Home")
-
-        playButton.tap()
+        // Home screen: start today's game, or review it if a previous test run
+        // already completed today's daily challenge in the simulator user store.
+        startTodayOrReview(in: app)
 
         // We're now in the modal GuessSession with the board visible.
         let session = app.otherElements["guessSessionView"]

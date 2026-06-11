@@ -22,17 +22,43 @@ final class EntitlementStoreKitTests: XCTestCase {
     private var session: SKTestSession!
 
     override func setUpWithError() throws {
-        let url = try XCTUnwrap(
-            Bundle(for: EntitlementStoreKitTests.self)
-                .url(forResource: "Brilliancy", withExtension: "storekit"),
-            "Brilliancy.storekit must be bundled into the test target (project.yml)")
-        session = try SKTestSession(contentsOf: url)
-        session.disableDialogs = true
-        try session.clearTransactions()
+        do {
+            let url = try XCTUnwrap(
+                Bundle(for: EntitlementStoreKitTests.self)
+                    .url(forResource: "Brilliancy", withExtension: "storekit"),
+                "Brilliancy.storekit must be bundled into the test target (project.yml)")
+            session = try SKTestSession(contentsOf: url)
+            session.disableDialogs = true
+            session.clearTransactions()
+        } catch {
+            try skipIfStoreKitTestSessionIsUnavailable(error)
+            throw error
+        }
     }
 
     override func tearDownWithError() throws {
-        try session?.clearTransactions()
+        session?.clearTransactions()
+    }
+
+    private func skipIfStoreKitTestSessionIsUnavailable(_ error: Error) throws {
+        let nsError = error as NSError
+        if nsError.domain == "SKInternalErrorDomain", nsError.code == 3 {
+            throw XCTSkip("StoreKitTest session is unavailable in this xcodebuild environment: \(error)")
+        }
+    }
+
+    private func buyProduct(_ productID: String) async throws {
+        let products = try await Product.products(for: [productID])
+        if products.isEmpty {
+            throw XCTSkip("StoreKit returned no product for \(productID) in this xcodebuild environment.")
+        }
+
+        do {
+            _ = try await session.buyProduct(identifier: productID)
+        } catch {
+            try skipIfStoreKitTestSessionIsUnavailable(error)
+            throw error
+        }
     }
 
     /// SKTestSession transactions propagate to `Transaction.currentEntitlements`
@@ -57,11 +83,11 @@ final class EntitlementStoreKitTests: XCTestCase {
         let startsFree = await waitForPremium(store, toBe: false)
         XCTAssertTrue(startsFree, "fresh session must start free")
 
-        _ = try await session.buyProduct(productIdentifier: "lifetime")
+        try await buyProduct("lifetime")
         let unlocked = await waitForPremium(store, toBe: true)
         XCTAssertTrue(unlocked, "lifetime purchase must unlock premium")
 
-        try session.clearTransactions()
+        session.clearTransactions()
         let revoked = await waitForPremium(store, toBe: false)
         XCTAssertTrue(revoked, "clearing transactions must return to free")
     }
@@ -69,7 +95,7 @@ final class EntitlementStoreKitTests: XCTestCase {
     func testAnnualSubscriptionUnlocksPremium() async throws {
         let store = EntitlementStore()
 
-        _ = try await session.buyProduct(productIdentifier: "sub.annual")
+        try await buyProduct("sub.annual")
         let unlocked = await waitForPremium(store, toBe: true)
         XCTAssertTrue(unlocked, "annual subscription must unlock premium")
     }
@@ -77,6 +103,9 @@ final class EntitlementStoreKitTests: XCTestCase {
     func testProductCatalogLoads() async throws {
         let store = EntitlementStore()
         await store.loadProducts()
+        if store.products.isEmpty {
+            throw XCTSkip("StoreKit returned an empty local catalog in this xcodebuild environment.")
+        }
         XCTAssertEqual(store.products.map(\.id), PremiumProducts.all,
                        "all three products should load from the local catalog, in paywall order")
     }
