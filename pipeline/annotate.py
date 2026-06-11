@@ -42,6 +42,9 @@ HARD RULES (a validator rejects violations):
   and which cover the escape squares. Credit ONLY those pieces — no others.
 - Interpretive color ("the defense is overloaded") is welcome, but its direction must match
   the evals: only describe a side as better/struggling if the numbers say so.
+- King-safety claims are bounded by the CASTLING line in the data: say the enemy king is
+  "stuck in the center" / "can no longer castle" ONLY if it has no castling rights left.
+  While rights remain, say "still in the center" or "behind in development" instead.
 
 STYLE:
 - Audience: 800-2000 rated improvers. Prefer plain plan-language over deep variations.
@@ -185,6 +188,17 @@ def build_move_prompt(game: GameRecord, move: MoveRecord) -> str:
         if pattern.is_mate:
             lines.append(f"           MATE FACTS: checking piece(s): {', '.join(pattern.checkers)}; "
                          f"escape squares covered by: {', '.join(pattern.supporters) or 'none needed'}")
+
+    rights = facts.opponent_castling_rights(move.fen_before, move.uci)
+    if rights is not None:
+        sides = [s for s, ok in (("kingside", rights["kingside"]),
+                                 ("queenside", rights["queenside"])) if ok]
+        lines += [
+            "",
+            f"CASTLING: after {master_san}, the opponent "
+            + (f"still has castling rights ({' and '.join(sides)})." if sides
+               else "has NO castling rights left."),
+        ]
 
     if upcoming:
         lines += [

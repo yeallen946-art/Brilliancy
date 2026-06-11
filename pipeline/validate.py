@@ -43,6 +43,14 @@ SAN_TOKEN_RE = re.compile(
     r"\b(O-O-O|O-O|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?[+#]?)\b"
 )
 
+# "King stuck in the center" class of claim — only allowed when the enemy king has
+# NO castling rights left (facts.opponent_castling_rights). Jerry 2026-06-11: the
+# Opera m9 prose overclaimed while Black could still castle either side.
+STUCK_KING_RE = re.compile(
+    r"\b(stuck in the cent|trapped in the cent|can(?:not|'t) castle|"
+    r"no longer castle|never castles?|unable to castle)", re.I
+)
+
 # Mate-claim patterns checked against facts.mate_pattern (the "two bishops" class).
 # "double-bishop mate", "two rooks", "both knights", "pair of bishops":
 DOUBLE_KIND_RE = re.compile(
@@ -216,6 +224,15 @@ def validate_move(game_id: str, move: MoveRecord,
     # 4b) spoiler guard: must not name a master move the trainee still has to guess.
     errors.extend(check_future_guess_spoilers(
         text, upcoming_sans or [], game_id, move.ply, "annotation"))
+
+    # 4c) "stuck in the center" claims need the rights to actually be gone.
+    if STUCK_KING_RE.search(text):
+        rights = facts.opponent_castling_rights(move.fen_before, move.uci)
+        if rights is not None and (rights["kingside"] or rights["queenside"]):
+            errors.append(ValidationError(
+                game_id, move.ply, "unsupported_stuck_king_claim",
+                "claims the enemy king is stuck / cannot castle, but it still has "
+                f"castling rights ({rights})"))
 
     # 5) alternative-move notes: same move-mention rule, plus material claims must be
     #    backed by a capture in THAT move's refutation line (TECH_SPEC §5 honesty rule).

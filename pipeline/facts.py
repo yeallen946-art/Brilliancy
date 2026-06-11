@@ -162,6 +162,30 @@ def tactical_motifs(fen_before: str, uci: str) -> list[str]:
     return motifs
 
 
+def opponent_castling_rights(fen_before: str, uci: str) -> dict | None:
+    """Castling rights of the side to move AFTER `uci` (i.e. the mover's opponent).
+
+    Bounds 'king stuck in the center' claims (Jerry 2026-06-11: the Opera m9 prose
+    overclaimed — Black could still castle either side via ...Nbd7/O-O-O or
+    ...Qc7/Bd6/O-O). Such claims are only allowed when NO rights remain; otherwise
+    the prose must say 'still in the center' / 'behind in development'.
+    Returns {"kingside": bool, "queenside": bool} or None if the move is illegal.
+    """
+    board = chess.Board(fen_before)
+    try:
+        move = chess.Move.from_uci(uci)
+        if not board.is_legal(move):
+            return None
+        board.push(move)
+    except (ValueError, AssertionError):
+        return None
+    opponent = board.turn
+    return {
+        "kingside": board.has_kingside_castling_rights(opponent),
+        "queenside": board.has_queenside_castling_rights(opponent),
+    }
+
+
 def move_character(fen_before: str, uci: str) -> list[str]:
     """Simple computed character tags for one move: check / capture / mate / promotion."""
     board = chess.Board(fen_before)

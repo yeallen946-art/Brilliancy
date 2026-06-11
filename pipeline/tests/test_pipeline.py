@@ -248,6 +248,44 @@ def test_move_prompt_drops_alternatives_colliding_with_future_answers():
     assert "d4" not in table
 
 
+def test_opponent_castling_rights_fact():
+    import facts
+    # After 1.e4 Black retains both rights.
+    rights = facts.opponent_castling_rights(START_FEN, "e2e4")
+    assert rights == {"kingside": True, "queenside": True}
+    # No rights in the FEN -> both False.
+    bare = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1"
+    assert facts.opponent_castling_rights(bare, "e2e4") == {"kingside": False, "queenside": False}
+    assert facts.opponent_castling_rights(START_FEN, "e2e5") is None  # illegal
+
+
+def test_validate_flags_unbacked_stuck_king_claim():
+    from validate import validate_move
+    move = MoveRecord(
+        ply=20, san="e4", uci="e2e4", fen_before=START_FEN, mover="white",
+        is_guess_point=True, annotation="e4 keeps the enemy king stuck in the center.",
+        legal_evals={"e2e4": {"cp": 30}},
+    )
+    codes = {e.code for e in validate_move("g", move)}
+    assert "unsupported_stuck_king_claim" in codes
+    # Same claim with rights actually gone -> allowed.
+    no_rights = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQ - 0 1"  # black has none
+    move_ok = MoveRecord(
+        ply=20, san="e4", uci="e2e4", fen_before=no_rights, mover="white",
+        is_guess_point=True, annotation="e4 keeps the enemy king stuck in the center.",
+        legal_evals={"e2e4": {"cp": 30}},
+    )
+    assert "unsupported_stuck_king_claim" not in {e.code for e in validate_move("g", move_ok)}
+
+
+def test_move_prompt_carries_castling_fact():
+    from annotate import build_move_prompt
+    game = _two_point_game("placeholder")
+    prompt = build_move_prompt(game, game.moves[0])
+    assert "CASTLING:" in prompt
+    assert "kingside and queenside" in prompt
+
+
 def test_unshippable_reasons():
     g = _approved_game()
     assert build.unshippable_reasons(g) == []
