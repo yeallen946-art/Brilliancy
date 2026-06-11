@@ -11,6 +11,7 @@ struct HomeView: View {
     @State private var playing: GameContent?
     @State private var dailyGame: GameContent?
     @State private var paywall: PaywallTrigger?
+    @State private var showSettings = false
 
     /// Pipeline content from the bundled content.sqlite (GRDB path Mac-verified,
     /// issue #3). User-visible content comes from the DB; the M1 sample remains only
@@ -55,6 +56,20 @@ struct HomeView: View {
             }
             .navigationTitle("Brilliancy")
             .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showSettings = true
+                    } label: {
+                        Image(systemName: "gearshape")
+                            .foregroundStyle(Theme.textSecondary)
+                    }
+                    .accessibilityIdentifier("settingsButton")
+                }
+            }
+            .sheet(isPresented: $showSettings) {
+                SettingsView()
+            }
             .fullScreenCover(item: $playing) { game in
                 GuessSessionView(
                     game: game,

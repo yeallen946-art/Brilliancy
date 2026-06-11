@@ -61,6 +61,41 @@ truncation/lock incidents); issues are server-side, atomic, and stateful.
 6. One-time setup per machine: `gh` installed + `gh auth login` (Jerry does auth; agents
    never store their own credentials).
 
+## Repo structure & cross-client sharing (monorepo)
+
+One repo, not one-per-client. Two clients ship from it — native iOS (overseas) and, later, a WeChat mini-program (China) — plus a shared Python pipeline and a shared data/contract layer.
+
+```
+/pipeline       Python content pipeline (shared upstream, single source of truth)
+/shared         cross-client contract: content JSON schema + golden test vectors
+/content        data: source PGNs committed; build artifacts gitignored
+/App            native iOS (SwiftUI, XcodeGen) — overseas
+/miniprogram    WeChat mini-program (JS) — China, NEAR-TERM parallel track
+(docs at root: PRD.md, TECH_SPEC.md, AGENTS.md, CLAUDE.md, ROADMAP.md, UI_FLOW.md)
+```
+
+Why monorepo: schema, test vectors, content, and pipeline are shared by both clients. One repo = a scoring/schema change touches pipeline + contract + both clients' tests in ONE atomic commit, no cross-repo skew. Simplest for a solo dev + agents.
+
+**Sequencing note (PRD §12.6):** the mini-program is NOT a far-future "phase 3" — Jerry already has a paid mini-program launching, so the China entity / ICP / payment / 备案 infrastructure is already paid for. The two clients are near-parallel. Build the shared layer (`/pipeline`, `/shared`) and the thin-client architecture FIRST so neither client is throwaway; then native (overseas) and mini-program (China) proceed near-parallel. The native client must be built thin NOW (logic precomputed into the JSON) precisely because the mini-program is close behind.
+
+**Sharing principle — thin clients over a fat shared data layer. Do NOT port logic between Swift and JS.**
+
+- Push every computable value into the pipeline → precomputed into the shared JSON (per-move score + score band, motif tags, annotation text, templated long-tail prose, difficulty). Both clients only *render* it. This is the bulk of reuse and it's free — it's data, not code. **Refines TECH_SPEC §3.2: scoring is precomputed in the pipeline, not computed in the client.** Build the native client thin NOW so the mini-program is later just "another UI shell over the same JSON."
+- Chess move-gen / SAN-FEN: standard library per platform (ChessKit on native, chess.js in the mini-program). Don't hand-roll twice.
+- Irreducible stateful logic that can't be precomputed (rating update, streak): reimplement minimally per client, kept identical by **golden test vectors in `/shared`** — the Swift and JS test suites run the same input→expected cases. The shared thing is the test vector, not the code.
+- No backend just to share logic. No Swift↔JS cross-compilation.
+
+**Branching:**
+
+- Shared layer (`pipeline`, `shared`, `content`) → trunk: small commits straight to `main`; everyone depends on it.
+- Client-specific work (`App`, `miniprogram`) → feature branches merged via PR, so the two clients develop in parallel without stepping on each other.
+
+**CI enforces the cross-client guarantee:** every push runs pipeline `pytest` + Swift tests + JS tests, all against the same `/shared` golden vectors. Divergent scoring/rating fails CI and can't merge.
+
+**Entity ≠ repo.** Individual (overseas) vs China-company (mainland) is a *publishing-account* matter (App Store / WeChat), not a code-repo matter — one private repo builds both. Only future exception: if China requires domestic source hosting, *mirror* `/miniprogram` to a domestic git (Gitee/Coding) — a sync, not a split.
+
+**Release tags are independent:** `app-vX.Y` and `mp-vX.Y` ship on separate cadences; don't couple them.
+
 ## Cross-platform gotchas (set up once)
 
 - `.gitattributes` forces `* text=auto eol=lf` so line endings don't churn between Windows and macOS.
