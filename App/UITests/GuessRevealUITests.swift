@@ -66,4 +66,45 @@ final class GuessRevealUITests: XCTestCase {
             .containing(NSPredicate(format: "label BEGINSWITH 'Master played'")).firstMatch
         XCTAssertTrue(master.exists, "master annotation card should be shown")
     }
+
+    /// Gap-2 coverage (Jerry 2026-06-11): an engine-EQUAL non-master guess must get
+    /// the POSITIVE card. Real curated content never has such a move (the master is
+    /// always clearly best), so this uses the DEBUG-only fixture game injected via
+    /// launch argument: master e4 (+0.30) with Nf3 tied at +0.25.
+    func testEngineEqualGuessShowsPositiveCard() {
+        let app = XCUIApplication()
+        app.launchArguments += ["-uiTestEqualGuessFixture"]
+        app.launch()
+
+        app.tabBars.buttons["Train"].tap()
+        let fixtureRow = app.buttons
+            .containing(NSPredicate(format: "label CONTAINS 'Equal Guess'")).firstMatch
+        XCTAssertTrue(fixtureRow.waitForExistence(timeout: 10), "fixture game should be listed")
+        fixtureRow.tap()
+
+        let begin = app.buttons["Begin"]
+        XCTAssertTrue(begin.waitForExistence(timeout: 10))
+        begin.tap()
+
+        // Ply 1 IS the guess point — no autoplay wait.
+        let prompt = app.staticTexts
+            .containing(NSPredicate(format: "label CONTAINS 'What did'")).firstMatch
+        XCTAssertTrue(prompt.waitForExistence(timeout: 10), "guess prompt should appear immediately")
+
+        let board = app.descendants(matching: .any)["boardView"]
+        XCTAssertTrue(board.waitForExistence(timeout: 10))
+        tapSquare(board, file: 6, rank: 0)   // g1
+        tapSquare(board, file: 5, rank: 2)   // f3 — engine-equal, not the master move
+
+        let banner = app.descendants(matching: .any)["feedbackPanel"]
+        XCTAssertTrue(banner.waitForExistence(timeout: 10), "feedback banner should appear")
+
+        XCTAssertTrue(app.staticTexts["You played Nf3"].waitForExistence(timeout: 5),
+                      "positive card should name the guess in SAN")
+        let praise = app.staticTexts
+            .containing(NSPredicate(format: "label CONTAINS 'just as strong'")).firstMatch
+        XCTAssertTrue(praise.exists, "engine-equal guess must be praised, not criticized")
+        XCTAssertTrue(app.staticTexts["+100"].exists,
+                      "engine-equal guess earns full points in the banner")
+    }
 }

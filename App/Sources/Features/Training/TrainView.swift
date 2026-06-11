@@ -9,7 +9,17 @@ struct TrainView: View {
     @State private var playing: GameContent?
     @State private var paywall: PaywallTrigger?
 
-    private let games: [GameContent] = ContentStore.bundledGames()
+    private let games: [GameContent] = {
+        var games = ContentStore.bundledGames()
+        #if DEBUG
+        // UI-test-only fixture (positive reveal card needs an engine-equal guess,
+        // which curated content never contains). Inert without the launch argument.
+        if UITestFixtures.isEqualGuessFixtureEnabled {
+            games.append(UITestFixtures.equalGuessGame)
+        }
+        #endif
+        return games
+    }()
 
     private var unlockedIDs: Set<String> {
         entitlements.isPremium ? Set(games.map(\.id)) : FreeTier.unlockedGameIDs(in: games)
