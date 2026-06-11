@@ -55,6 +55,7 @@ final class ContentStoreTests: XCTestCase {
         XCTAssertEqual(game.id, "g1")
         XCTAssertEqual(game.title, "Test Game")
         XCTAssertEqual(game.heroColor, .white)
+        XCTAssertEqual(game.heroDisplayName, "White")
         XCTAssertEqual(game.moves.count, 2)
         XCTAssertEqual(game.startFen, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
         XCTAssertEqual(game.guessPointCount, 1)
@@ -107,5 +108,22 @@ final class ContentStoreTests: XCTestCase {
         XCTAssertEqual(ContentStore.tags(fromJson: nil), [])
         XCTAssertEqual(ContentStore.tags(fromJson: "[\"unknown_tag\"]"), [])
         XCTAssertEqual(ContentStore.mover(fromFen: "8/8/8/8/8/8/8/8 b - - 0 1"), .black)
+    }
+
+    func testHeroDisplayNameHandlesPlainNames() {
+        let game = GameContent(
+            id: "plain",
+            white: "Paul Morphy",
+            black: "Duke Karl",
+            event: "Test",
+            year: 1858,
+            result: "1-0",
+            heroColor: .white,
+            title: "Plain",
+            narrativeIntro: "",
+            startFen: FEN.start,
+            moves: []
+        )
+        XCTAssertEqual(game.heroDisplayName, "Morphy")
     }
 }

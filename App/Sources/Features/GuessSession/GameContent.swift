@@ -19,6 +19,12 @@ struct GameContent: Identifiable {
     var guessPoints: [ContentMove] { moves.filter(\.isGuessPoint) }
     var guessPointCount: Int { guessPoints.count }
     var heroName: String { heroColor == .white ? white : black }
+    var heroDisplayName: String {
+        if let comma = heroName.firstIndex(of: ",") {
+            return String(heroName[..<comma]).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return heroName.split(separator: " ").last.map(String.init) ?? heroName
+    }
     var subtitle: String { "\(white) vs. \(black) · \(event) · \(year)" }
 }
 

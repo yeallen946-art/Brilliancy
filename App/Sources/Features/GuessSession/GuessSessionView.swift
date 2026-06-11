@@ -207,7 +207,7 @@ struct GuessSessionView: View {
     // MARK: - Helpers
 
     private var heroColorName: String { model.game.heroColor == .white ? "White" : "Black" }
-    private var heroLastName: String { model.game.heroName.split(separator: " ").last.map(String.init) ?? model.game.heroName }
+    private var heroLastName: String { model.game.heroDisplayName }
 
     private func bandColor(_ band: ScoreBand) -> Color {
         switch band {
