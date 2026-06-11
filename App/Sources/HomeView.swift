@@ -35,12 +35,19 @@ struct HomeView: View {
                 ScrollView {
                     VStack(spacing: Theme.Space.lg) {
                         featuredSection
-                        if featured != nil {
-                            Button("Play today's game") { playing = featured }
-                                .buttonStyle(GoldButtonStyle())
-                                .accessibilityIdentifier("playTodayButton")
+                        if let featured {
+                            if let daily = dailyGame,
+                               let result = userStore?.latestResult(for: daily.id),
+                               daily.id == featured.id {
+                                completedSection(result)
+                            } else {
+                                Button("Play today's game") { playing = featured }
+                                    .buttonStyle(GoldButtonStyle())
+                                    .accessibilityIdentifier("playTodayButton")
+                            }
                         }
                         librarySection
+                        archiveSection
                         NavigationLink("Board sandbox (debug)") { BoardSandboxView() }
                             .font(.footnote)
                             .foregroundStyle(Theme.textSecondary)
@@ -118,6 +125,82 @@ struct HomeView: View {
                     .foregroundStyle(Theme.textSecondary)
             }
         }
+    }
+
+    /// S1 completed state (UI_FLOW): score + band row + Share / Review instead of
+    /// the play CTA once today's challenge is done.
+    @State private var completedShareImage: Image?
+
+    private func completedSection(_ result: (score: Int, bands: [ScoreBand])) -> some View {
+        VStack(spacing: Theme.Space.sm) {
+            Text("COMPLETED \u{2713}")
+                .font(.system(size: 11, weight: .medium))
+                .kerning(0.8)
+                .foregroundStyle(Theme.feedbackGreen)
+            Text("Your score: \(result.score)")
+                .font(.system(size: 22, weight: .medium))
+                .foregroundStyle(Theme.gold)
+            if !result.bands.isEmpty {
+                Text(result.bands.map(\.emoji).joined())
+                    .font(.title3)
+            }
+            HStack(spacing: Theme.Space.md) {
+                if let completedShareImage {
+                    ShareLink(
+                        item: completedShareImage,
+                        preview: SharePreview("Brilliancy \u{2014} \(result.score)",
+                                              image: completedShareImage)
+                    ) {
+                        Text("Share")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(Theme.gold)
+                    }
+                }
+                Button("Review") { playing = featured }
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(Theme.textSecondary)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .cardSurface()
+        .onAppear {
+            if completedShareImage == nil {
+                completedShareImage = ShareCard.render(ShareCardData(
+                    date: Date(),
+                    score: result.score,
+                    bands: result.bands,
+                    streak: userStore?.streak.current ?? 0
+                ))
+            }
+        }
+    }
+
+    /// Archive entry (PRD §4.1: 历史每日挑战归档 → 付费解锁; the list is browsable free).
+    private var archiveSection: some View {
+        NavigationLink {
+            ArchiveView(userStore: userStore)
+        } label: {
+            HStack {
+                Image(systemName: "calendar.badge.clock")
+                    .foregroundStyle(Theme.textSecondary)
+                Text("Past daily challenges")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(Theme.textPrimary)
+                Spacer()
+                if !entitlements.isPremium {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Theme.textSecondary)
+                }
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Theme.textSecondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .cardSurface(padding: Theme.Space.sm)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("archiveLink")
     }
 
     private var librarySection: some View {

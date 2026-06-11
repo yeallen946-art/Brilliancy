@@ -57,6 +57,10 @@ final class UserStore {
                     last_completed_date TEXT
                 );
                 """)
+            // Additive migration: bands persist so the share card can re-render
+            // from history (S1 completed state). Fails harmlessly when the column
+            // already exists.
+            try? db.execute(sql: "ALTER TABLE guesses ADD COLUMN band TEXT NOT NULL DEFAULT ''")
         }
     }
 
@@ -71,10 +75,11 @@ final class UserStore {
             for guess in outcome.guesses {
                 try db.execute(
                     sql: """
-                    INSERT INTO guesses (game_id, ply, guessed_uci, score, created_at)
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO guesses (game_id, ply, guessed_uci, score, created_at, band)
+                    VALUES (?, ?, ?, ?, ?, ?)
                     """,
-                    arguments: [outcome.gameId, guess.ply, guess.uci, guess.score, stamp])
+                    arguments: [outcome.gameId, guess.ply, guess.uci, guess.score, stamp,
+                                guess.band.rawValue])
             }
             try db.execute(
                 sql: "INSERT INTO game_results (game_id, total_score, completed_at) VALUES (?, ?, ?)",
@@ -98,6 +103,25 @@ final class UserStore {
                 db, sql: "SELECT rating FROM rating_history ORDER BY rowid DESC LIMIT 1")
         }
         return stored.flatMap { $0 } ?? fallback
+    }
+
+    /// Latest finished result for one game: total score + per-point bands in play
+    /// order (S1 completed state / share-card re-render). nil if never completed.
+    func latestResult(for gameId: String) -> (score: Int, bands: [ScoreBand])? {
+        try? dbQueue.read { db in
+            guard let row = try Row.fetchOne(
+                db,
+                sql: "SELECT total_score, completed_at FROM game_results WHERE game_id = ? ORDER BY rowid DESC LIMIT 1",
+                arguments: [gameId])
+            else { return nil }
+            let score: Int = row["total_score"]
+            let stamp: String = row["completed_at"]
+            let raws = try String.fetchAll(
+                db,
+                sql: "SELECT band FROM guesses WHERE game_id = ? AND created_at = ? ORDER BY ply",
+                arguments: [gameId, stamp])
+            return (score, raws.compactMap(ScoreBand.init(rawValue:)))
+        } ?? nil
     }
 
     func completedGameIds() -> Set<String> {

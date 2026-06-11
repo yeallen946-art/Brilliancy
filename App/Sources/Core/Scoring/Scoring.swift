@@ -38,7 +38,9 @@ struct ScoringConfig {
 }
 
 /// 3-tier feedback band (color + accessible icon, UI_FLOW §4 — never color alone).
-enum ScoreBand {
+/// String raw value: bands persist to user.sqlite so the share card can be
+/// re-rendered later (S1 completed state) without re-deriving flags.
+enum ScoreBand: String {
     case green   // match / engine-best / good
     case yellow  // playable but not best
     case red     // mistake / blunder

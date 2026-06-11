@@ -21,8 +21,22 @@ final class UserStoreTests: XCTestCase {
             gameId: "g1",
             totalScore: score,
             finalRating: rating,
-            guesses: [(ply: 22, uci: "b6a4", score: 100), (ply: 26, uci: "a7a6", score: 0)]
+            guesses: [(ply: 22, uci: "b6a4", score: 100, band: .green),
+                      (ply: 26, uci: "a7a6", score: 0, band: .red)]
         )
+    }
+
+    func testLatestResultReturnsScoreAndBandsInPlayOrder() throws {
+        let store = try UserStore(dbQueue: DatabaseQueue())
+        XCTAssertNil(store.latestResult(for: "g1"))
+
+        store.record(outcome(score: 50), isDaily: false, calendar: calendar, now: day(2026, 6, 10))
+        store.record(outcome(score: 80), isDaily: false, calendar: calendar, now: day(2026, 6, 11))
+
+        let result = try XCTUnwrap(store.latestResult(for: "g1"))
+        XCTAssertEqual(result.score, 80)                  // latest session wins
+        XCTAssertEqual(result.bands, [.green, .red])      // play order, from raw values
+        XCTAssertNil(store.latestResult(for: "other"))
     }
 
     func testRecordWritesAllTables() throws {

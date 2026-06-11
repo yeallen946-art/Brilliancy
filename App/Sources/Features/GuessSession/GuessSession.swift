@@ -208,7 +208,7 @@ struct GameOutcome {
     let gameId: String
     let totalScore: Int
     let finalRating: Double
-    let guesses: [(ply: Int, uci: String, score: Int)]
+    let guesses: [(ply: Int, uci: String, score: Int, band: ScoreBand)]
 }
 
 extension GuessSessionModel {
@@ -217,7 +217,9 @@ extension GuessSessionModel {
             gameId: game.id,
             totalScore: totalScore,
             finalRating: rating,
-            guesses: results.map { ($0.ply, $0.guessedUci, $0.evaluation.displayPoints) }
+            guesses: results.map {
+                ($0.ply, $0.guessedUci, $0.evaluation.displayPoints, $0.evaluation.band)
+            }
         )
     }
 }

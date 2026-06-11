@@ -23,6 +23,7 @@ enum PaywallTrigger: String, Identifiable {
     case postDaily = "post_daily"
     case lockedGame = "locked_game"
     case lockedProgress = "locked_progress"
+    case lockedArchive = "locked_archive"
 
     var id: String { rawValue }
 }
