@@ -1,20 +1,22 @@
-﻿import XCTest
+import XCTest
 @testable import Brilliancy
 
-/// "Why your move falls short" (PRD section 6). Prose comes from alt_annotations; the
-/// long-tail template only states engine facts (eval delta + refutation SAN).
-final class WrongGuessExplainerTests: XCTestCase {
+/// The "your move" card (PRD section 6). Three cases: master match -> nil (merged
+/// into the master card); engine-equal/better -> positive explanation; worse -> why
+/// it falls short. Prose comes from alt_annotations; templates state engine facts only.
+final class GuessExplainerTests: XCTestCase {
 
     private let startFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 
     private func makePoint(
         masterUci: String = "e2e4",
+        masterSan: String = "e4",
         candidateEvals: [String: Int],
         candidateDetails: [String: CandidateDetail] = [:],
         altAnnotations: [String: String] = [:]
     ) -> ContentMove {
         ContentMove(
-            ply: 1, uci: masterUci, san: "e4", fenBefore: startFen, mover: .white,
+            ply: 1, uci: masterUci, san: masterSan, fenBefore: startFen, mover: .white,
             isGuessPoint: true, tags: [], annotation: "Master move prose.",
             candidateEvals: candidateEvals,
             candidateDetails: candidateDetails,
@@ -22,30 +24,71 @@ final class WrongGuessExplainerTests: XCTestCase {
         )
     }
 
-    private func explain(_ guessUci: String, point: ContentMove) -> WrongGuessExplainer.Explanation? {
+    private func explain(_ guessUci: String, point: ContentMove) -> GuessExplainer.Explanation? {
         let evaluation = Scoring.evaluate(
             guessUci: guessUci,
             masterUci: point.uci,
             candidateEvals: point.candidateEvals
         )
-        return WrongGuessExplainer.explanation(guessUci: guessUci, evaluation: evaluation, point: point)
+        return GuessExplainer.explanation(guessUci: guessUci, evaluation: evaluation, point: point)
     }
 
-    // MARK: - When NO explanation is owed
+    // MARK: - Master match: single merged card
 
-    func testNoExplanationForMatchEngineTopOrBeatMaster() throws {
-        // match
-        var point = makePoint(candidateEvals: ["e2e4": 30, "d2d4": -100])
+    func testNoCardWhenMatchingTheMaster() throws {
+        let point = makePoint(candidateEvals: ["e2e4": 30, "d2d4": -100])
         XCTAssertNil(explain("e2e4", point: point))
-        // engine-top non-match (tied with best)
-        point = makePoint(candidateEvals: ["e2e4": 30, "g1f3": 25])
-        XCTAssertNil(explain("g1f3", point: point))
-        // beat the master
-        point = makePoint(candidateEvals: ["e2e4": 10, "d2d4": 60])
-        XCTAssertNil(explain("d2d4", point: point))
     }
 
-    // MARK: - Content priority
+    // MARK: - Engine-equal / better: positive explanation
+
+    func testEngineTopGuessPrefersAltProse() throws {
+        let point = makePoint(
+            candidateEvals: ["e2e4": 30, "g1f3": 25],
+            candidateDetails: ["g1f3": CandidateDetail(san: "Nf3", refutationSan: [], motif: "best")],
+            altAnnotations: ["g1f3": "Equally strong: it develops with tempo."]
+        )
+        let explanation = try XCTUnwrap(explain("g1f3", point: point))
+        XCTAssertEqual(explanation.guessSan, "Nf3")
+        XCTAssertEqual(explanation.text, "Equally strong: it develops with tempo.")
+    }
+
+    func testEngineTopGuessTemplateWithoutProse() throws {
+        let point = makePoint(
+            candidateEvals: ["e2e4": 30, "g1f3": 25],
+            candidateDetails: ["g1f3": CandidateDetail(san: "Nf3", refutationSan: [], motif: "best")]
+        )
+        let text = try XCTUnwrap(explain("g1f3", point: point)).text
+        XCTAssertTrue(text.contains("just as strong"), text)
+        XCTAssertTrue(text.contains("+0.2"), text)        // the guess's own eval, in pawns
+    }
+
+    func testBeatMasterUsesEngineNumbersNotAltProse() throws {
+        // Alt prose is written from a "why it is worse" angle — must not be shown
+        // when the engine PREFERS the user's move.
+        let point = makePoint(
+            candidateEvals: ["e2e4": 10, "d2d4": 60],
+            candidateDetails: ["d2d4": CandidateDetail(san: "d4", refutationSan: [], motif: "best")],
+            altAnnotations: ["d2d4": "Worse because reasons (stale prose)."]
+        )
+        let text = try XCTUnwrap(explain("d2d4", point: point)).text
+        XCTAssertTrue(text.contains("engine actually prefers d4"), text)
+        XCTAssertTrue(text.contains("+0.6") && text.contains("+0.1"), text)
+        XCTAssertFalse(text.contains("stale prose"), text)
+    }
+
+    func testEqualMateGuessPraisedAsAlsoForcingMate() throws {
+        let mate2 = ContentStore.mateBaseCp - 200
+        let point = makePoint(
+            candidateEvals: ["e2e4": mate2, "d2d4": mate2],
+            candidateDetails: ["d2d4": CandidateDetail(san: "d4", refutationSan: [], motif: "best")]
+        )
+        let text = try XCTUnwrap(explain("d2d4", point: point)).text
+        XCTAssertTrue(text.contains("also forces mate"), text)
+        XCTAssertFalse(text.contains("pawns"), text)
+    }
+
+    // MARK: - Worse: content priority
 
     func testPipelineProsePreferredOverTemplate() throws {
         let point = makePoint(
@@ -80,8 +123,7 @@ final class WrongGuessExplainerTests: XCTestCase {
     // MARK: - Mate-aware phrasing (clamped evals, no absurd pawn counts)
 
     func testTemplateWhenGuessGetsMated() throws {
-        // mated in 2 -> clamped to -mateBase + 200
-        let mated = -ContentStore.mateBaseCp + 200
+        let mated = -ContentStore.mateBaseCp + 200   // mated in 2
         let point = makePoint(
             candidateEvals: ["e2e4": 30, "g2g4": mated],
             candidateDetails: ["g2g4": CandidateDetail(san: "g4", refutationSan: ["e6", "Qh4#"], motif: "blunder")]

@@ -128,18 +128,37 @@ def candidate_rows(move: MoveRecord) -> list[dict]:
     return rows
 
 
+def upcoming_guess_sans(game: GameRecord, move: MoveRecord) -> list[str]:
+    """SANs of the master moves the trainee must STILL guess after this one.
+    These are spoiler-protected: the annotation for this move may not identify them
+    (Jerry's report 2026-06-11: move-9 prose gave away moves 10-11)."""
+    return [
+        _san(m.fen_before, m.uci)
+        for m in game.moves
+        if m.is_guess_point and m.ply > move.ply
+    ]
+
+
 def build_move_prompt(game: GameRecord, move: MoveRecord) -> str:
     """User-message text: position + engine data + computed facts (TECH_SPEC §5.1).
 
-    Game identity is deliberately ABSENT — the model describes this board, not its
-    (possibly wrong) memory of a famous game. `game` is accepted for call-site
-    compatibility but never read.
+    Game IDENTITY is deliberately absent — the model describes this board, not its
+    (possibly wrong) memory of a famous game. Only the move list is read from `game`,
+    to compute which master moves are still unguessed (spoiler guard).
     """
-    _ = game  # identity intentionally unused (§5.1 strip-identity rule)
     board = chess.Board(move.fen_before)
     mover = "White" if board.turn == chess.WHITE else "Black"
     master_san = _san(move.fen_before, move.uci)
-    rows = candidate_rows(move)
+    upcoming = upcoming_guess_sans(game, move)
+
+    # Drop alternatives whose SAN collides with a still-to-be-guessed master move:
+    # the prompt would otherwise ask the model to discuss (and badmouth) the very
+    # move the trainee must find later (the "Rd1 is much weaker" leak, 2026-06-11).
+    protected = {s.rstrip("+#") for s in upcoming}
+    rows = [
+        r for r in candidate_rows(move)
+        if r["is_master"] or r["san"].rstrip("+#") not in protected
+    ]
 
     lines = [
         f"Position (FEN): {move.fen_before}",
@@ -166,6 +185,18 @@ def build_move_prompt(game: GameRecord, move: MoveRecord) -> str:
         if pattern.is_mate:
             lines.append(f"           MATE FACTS: checking piece(s): {', '.join(pattern.checkers)}; "
                          f"escape squares covered by: {', '.join(pattern.supporters) or 'none needed'}")
+
+    if upcoming:
+        lines += [
+            "",
+            "SPOILER GUARD: after this move, the trainee must still GUESS these master "
+            f"moves themselves: {', '.join(upcoming)}. Your prose must not identify any "
+            "of them in any way — never name such a move, the piece that will play it, "
+            "or its destination square, and never describe its concrete effect (no 'the "
+            "rook mates next', no 'the bishop delivers mate'). You may state the engine "
+            "VERDICT in general terms ('this forces mate', 'the attack crashes through') "
+            "without showing how.",
+        ]
 
     alt_sans = ", ".join(r["san"] for r in rows if not r["is_master"])
     lines += [

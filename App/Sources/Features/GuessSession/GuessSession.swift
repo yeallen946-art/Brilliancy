@@ -67,15 +67,15 @@ final class GuessSessionModel {
     /// 1-based "Move N" in chess move-pair terms, for the header.
     var currentMoveNumber: Int { ((currentMove?.ply ?? 1) + 1) / 2 }
 
-    /// Why the user's guess falls short (valid while revealed; nil when the guess
-    /// deserved full credit instead of an explanation). PRD §6 second half.
-    var wrongGuessExplanation: WrongGuessExplainer.Explanation? {
+    /// The "your move" card content (valid while revealed; nil when the user matched
+    /// the master — the master annotation alone covers that case). PRD §6.
+    var guessExplanation: GuessExplainer.Explanation? {
         guard phase == .revealed,
               let evaluation = lastEvaluation,
               let guessUci = lastGuessUci,
               let point = currentMove
         else { return nil }
-        return WrongGuessExplainer.explanation(
+        return GuessExplainer.explanation(
             guessUci: guessUci,
             evaluation: evaluation,
             point: point

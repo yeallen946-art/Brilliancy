@@ -140,7 +140,30 @@ def check_mate_claims(text: str, pattern: facts.MatePattern,
     return errors
 
 
-def validate_move(game_id: str, move: MoveRecord) -> list[ValidationError]:
+def _normalize_san(san: str) -> str:
+    return san.rstrip("+#")
+
+
+def check_future_guess_spoilers(text: str, upcoming_sans: list[str],
+                                game_id: str, ply: int, where: str) -> list[ValidationError]:
+    """Prose at one guess point must not NAME a master move the trainee still has to
+    guess (Jerry 2026-06-11). Deterministic half of the spoiler guard: literal SAN
+    mentions. Semantic spoilers ('the rook mates next') are the annotate-prompt's and
+    the human reviewer's job — strings can't judge those."""
+    if not text or not upcoming_sans:
+        return []
+    upcoming = {_normalize_san(s) for s in upcoming_sans}
+    return [
+        ValidationError(
+            game_id, ply, "spoils_future_guess",
+            f"{where} names '{token}', a master move the trainee still has to guess")
+        for token in extract_san_tokens(text)
+        if _normalize_san(token) in upcoming
+    ]
+
+
+def validate_move(game_id: str, move: MoveRecord,
+                  upcoming_sans: list[str] | None = None) -> list[ValidationError]:
     errors: list[ValidationError] = []
     text = move.annotation
     if not text:
@@ -190,12 +213,18 @@ def validate_move(game_id: str, move: MoveRecord) -> list[ValidationError]:
     pattern = facts.mate_pattern(move.fen_before, move.uci)
     errors.extend(check_mate_claims(text, pattern, game_id, move.ply))
 
+    # 4b) spoiler guard: must not name a master move the trainee still has to guess.
+    errors.extend(check_future_guess_spoilers(
+        text, upcoming_sans or [], game_id, move.ply, "annotation"))
+
     # 5) alternative-move notes: same move-mention rule, plus material claims must be
     #    backed by a capture in THAT move's refutation line (TECH_SPEC §5 honesty rule).
     for alt_uci, prose in (move.alt_annotations or {}).items():
         if not prose:
             continue
         errors.extend(_check_mentioned_moves(prose, move.fen_before, legal_ucis, game_id, move.ply))
+        errors.extend(check_future_guess_spoilers(
+            prose, upcoming_sans or [], game_id, move.ply, f"alt note for '{alt_uci}'"))
         if _contains_any(prose, MATERIAL_WORDS):
             refutation = (move.legal_evals.get(alt_uci) or {}).get("refutation_pv", [])
             if not line_has_capture(move.fen_before, alt_uci, refutation):
@@ -207,12 +236,21 @@ def validate_move(game_id: str, move: MoveRecord) -> list[ValidationError]:
     return errors
 
 
+def _move_san(move: MoveRecord) -> str:
+    try:
+        return chess.Board(move.fen_before).san(chess.Move.from_uci(move.uci))
+    except (ValueError, AssertionError):
+        return move.san or move.uci
+
+
 def validate_game(game: GameRecord) -> list[ValidationError]:
     errors: list[ValidationError] = []
     final_mate: tuple[int, facts.MatePattern] | None = None
+    guess_points = [m for m in game.moves if m.is_guess_point]
     for move in game.moves:
         if move.is_guess_point:
-            errors.extend(validate_move(game.id, move))
+            upcoming = [_move_san(m) for m in guess_points if m.ply > move.ply]
+            errors.extend(validate_move(game.id, move, upcoming_sans=upcoming))
             pattern = facts.mate_pattern(move.fen_before, move.uci)
             if pattern.is_mate:
                 final_mate = (move.ply, pattern)

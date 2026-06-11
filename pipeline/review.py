@@ -59,11 +59,19 @@ def render_game_html(game: GameRecord) -> str:
     if game.narrative_intro:
         parts.append(f"<p class='intro'>{_esc(game.narrative_intro)}</p>")
 
-    for move in game.guess_points:
+    guess_points = list(game.guess_points)
+    for move in guess_points:
         parts.append("<div class='point'>")
         parts.append(f"<div class='board'>{_board_svg(move)}</div>")
         parts.append("<div class='note'>")
         parts.append(f"<h3>Move {(move.ply + 1) // 2}: {_esc(move.san)}</h3>")
+        # Spoiler lens for the reviewer (Jerry 2026-06-11): the prose above must not
+        # give these away — the validator only catches literal SAN mentions, the human
+        # catches semantic leaks ("the rook mates next").
+        still = ", ".join(_esc(m.san) for m in guess_points if m.ply > move.ply)
+        if still:
+            parts.append(f"<p class='spoiler-check'><b>Still to guess after this:</b> {still} "
+                         "— the annotation must not give these away.</p>")
         parts.append(f"<p>{_esc(move.annotation or '(no annotation yet)')}</p>")
         if move.alt_annotations:
             parts.append("<div class='alt'><b>Alternatives:</b><ul>")

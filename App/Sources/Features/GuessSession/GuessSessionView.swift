@@ -123,27 +123,28 @@ struct GuessSessionView: View {
                 feedbackBanner(eval)
             }
             board(interactive: false, emphasis: revealEmphasis)
-            if let wrong = model.wrongGuessExplanation {
-                wrongGuessCard(wrong)
+            if let explanation = model.guessExplanation {
+                guessCard(explanation)
             }
             annotationCard
             Button("Next") { model.proceed() }.buttonStyle(GoldButtonStyle())
         }
     }
 
-    /// Why the user's move falls short (PRD §6) — pipeline prose or engine-templated.
-    private func wrongGuessCard(_ wrong: WrongGuessExplainer.Explanation) -> some View {
+    /// The "your move" card (PRD §6): praise for engine-equal-or-better guesses,
+    /// why-it-falls-short otherwise. Absent on a master match (single merged card).
+    private func guessCard(_ explanation: GuessExplainer.Explanation) -> some View {
         VStack(alignment: .leading, spacing: Theme.Space.xs) {
-            Text("You played \(wrong.guessSan)")
+            Text("You played \(explanation.guessSan)")
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(Theme.textSecondary)
-            Text(wrong.text)
+            Text(explanation.text)
                 .font(.system(size: 13)).foregroundStyle(Theme.textPrimary)
                 .lineSpacing(5).fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .cardSurface()
-        .accessibilityIdentifier("wrongGuessCard")
+        .accessibilityIdentifier("guessExplanationCard")
     }
 
     private func feedbackBanner(_ eval: GuessEvaluation) -> some View {

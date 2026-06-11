@@ -175,6 +175,79 @@ def test_validate_alt_illegal_move_mention():
     assert "illegal_move_mentioned" in codes
 
 
+def _two_point_game(first_annotation: str, alt_annotations: dict | None = None):
+    """Two guess points; the second master move is d4 (so 'd4' is a spoiler at the first)."""
+    first = MoveRecord(
+        ply=20, san="e4", uci="e2e4", fen_before=START_FEN, mover="white",
+        is_guess_point=True, difficulty=1300.0, tags=["tactical"],
+        eval_cp=30, legal_evals={"e2e4": {"cp": 30, "motif": "best"},
+                                 "d2d4": {"cp": 20, "motif": "ok"}},
+        annotation=first_annotation, alt_annotations=alt_annotations or {},
+    )
+    second = MoveRecord(
+        ply=22, san="d4", uci="d2d4", fen_before=START_FEN, mover="white",
+        is_guess_point=True, difficulty=1300.0, tags=["positional"],
+        eval_cp=20, legal_evals={"d2d4": {"cp": 20, "motif": "best"}},
+        annotation="A fine follow-up.", alt_annotations={},
+    )
+    return GameRecord(
+        id="spoiler-game", white="A", black="B", event="E", site="S", date="2026.06.11",
+        year=2026, result="1-0", eco="C00", hero_color="white", title="T",
+        narrative_intro="N", pack_id="p1", ply_count=2,
+        source_hash="hash", review_status=store.REVIEW_APPROVED, moves=[first, second],
+    )
+
+
+def test_validate_flags_annotation_spoiling_future_guess():
+    from validate import validate_game
+    game = _two_point_game("e4 is strong, and d4 comes next to seal it.")
+    codes = {e.code for e in validate_game(game)}
+    assert "spoils_future_guess" in codes
+    # The final guess point's own prose may of course discuss d4.
+    clean = _two_point_game("e4 stakes the center with a lasting initiative.")
+    assert "spoils_future_guess" not in {e.code for e in validate_game(clean)}
+
+
+def test_validate_flags_alt_note_spoilers_too():
+    from validate import validate_game
+    game = _two_point_game(
+        "e4 stakes the center.",
+        alt_annotations={"d2d4": "Premature; d4 works far better one move later."})
+    codes = {e.code for e in validate_game(game)}
+    assert "spoils_future_guess" in codes
+
+
+def test_validate_move_without_upcoming_keeps_old_behavior():
+    from validate import validate_move
+    game = _two_point_game("e4 is strong, and d4 comes next to seal it.")
+    # Direct validate_move call (no upcoming list) must not invent spoiler errors.
+    assert "spoils_future_guess" not in {e.code for e in validate_move("g", game.moves[0])}
+
+
+def test_move_prompt_carries_spoiler_guard():
+    from annotate import build_move_prompt
+    game = _two_point_game("placeholder")
+    first_prompt = build_move_prompt(game, game.moves[0])
+    assert "SPOILER GUARD" in first_prompt
+    assert "d4" in first_prompt.split("SPOILER GUARD")[1][:200]
+    # The last guess point has nothing left to spoil.
+    last_prompt = build_move_prompt(game, game.moves[1])
+    assert "SPOILER GUARD" not in last_prompt
+
+
+def test_move_prompt_drops_alternatives_colliding_with_future_answers():
+    from annotate import build_move_prompt
+    game = _two_point_game("placeholder")
+    # d2d4 is an engine candidate at the FIRST point, but d4 is the SECOND point's
+    # master move — the prompt must not ask for prose about it ("Rd1 leak" class).
+    first_prompt = build_move_prompt(game, game.moves[0])
+    alt_request = first_prompt.split("Write `alt_annotations`")[1]
+    assert "d4" not in alt_request.split("\n")[0]
+    # And it disappears from the candidate table too (only the master row remains).
+    table = first_prompt.split("Engine evaluations")[1].split("SPOILER GUARD")[0]
+    assert "d4" not in table
+
+
 def test_unshippable_reasons():
     g = _approved_game()
     assert build.unshippable_reasons(g) == []
