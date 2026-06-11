@@ -248,6 +248,47 @@ def test_move_prompt_drops_alternatives_colliding_with_future_answers():
     assert "d4" not in table
 
 
+def test_mate_in_two_defenses_enumerates_both_reti_branches():
+    import facts
+    # Réti m10: 10.Bg5+ forces mate in two with TWO defenses (the engine PV only
+    # ever showed Kc7 -> Bd8#; Ke8 -> Rd8# is just as forced).
+    fen = "rnbk1b1r/pp3ppp/2p5/4q3/4n3/8/PPPB1PPP/2KR1BNR w - - 0 10"
+    branches = facts.mate_in_two_defenses(fen, "d2g5")
+    by_reply = {b["reply_san"]: b["mate_san"] for b in branches}
+    assert by_reply == {"Kc7": "Bd8#", "Ke8": "Rd8#"}
+    # Non-mating move -> [] (a defense survives).
+    assert facts.mate_in_two_defenses(START_FEN, "e2e4") == []
+
+
+def test_final_mate_prompt_carries_branch_facts():
+    from annotate import build_move_prompt
+    m10 = MoveRecord(
+        ply=19, san="Bg5+", uci="d2g5",
+        fen_before="rnbk1b1r/pp3ppp/2p5/4q3/4n3/8/PPPB1PPP/2KR1BNR w - - 0 10",
+        mover="white", is_guess_point=True, annotation="x",
+        legal_evals={"d2g5": {"cp": None, "mate": 2, "refutation_pv": ["d8c7", "g5d8"]}},
+    )
+    m10_reply = MoveRecord(
+        ply=20, san="Kc7", uci="d8c7",
+        fen_before="rnbk1b1r/pp3ppp/2p5/4q1B1/4n3/8/PPP2PPP/2KR1BNR b - - 1 10",
+        mover="black", is_guess_point=False,
+    )
+    m11 = MoveRecord(
+        ply=21, san="Bd8#", uci="g5d8",
+        fen_before="rnb2b1r/ppk2ppp/2p5/4q1B1/4n3/8/PPP2PPP/2KR1BNR w - - 2 11",
+        mover="white", is_guess_point=True, annotation="x",
+        legal_evals={"g5d8": {"cp": None, "mate": 1, "refutation_pv": []}},
+    )
+    game = _approved_game()
+    game.moves = [m10, m10_reply, m11]
+
+    final_prompt = build_move_prompt(game, m11)
+    assert "BRANCH FACTS" in final_prompt
+    assert "Kc7 -> Bd8#" in final_prompt and "Ke8 -> Rd8#" in final_prompt
+    # The EARLIER ply must NOT carry branch facts (it would spoil the final move).
+    assert "BRANCH FACTS" not in build_move_prompt(game, m10)
+
+
 def test_skewer_motif_detection():
     import facts
     # Bishop to a3 hits Qe7 with Rf8 behind on the same diagonal -> skewer.

@@ -41,19 +41,29 @@
 
     },
     "ALL GAMES" : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "全部对局" } }
+      }
     },
     "About" : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "关于" } }
+      }
     },
     "Account" : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "账户" } }
+      }
     },
     "An AI coach explains why the master's move works — and why yours falls short." : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "AI 教练讲解大师着法为何成立——以及你的着法差在哪里。" } }
+      }
     },
     "Begin" : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "开始" } }
+      }
     },
     "Board sandbox (debug)" : {
 
@@ -68,157 +78,247 @@
 
     },
     "Chess board" : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "棋盘" } }
+      }
     },
     "Copy current" : {
 
     },
     "Daily reminder" : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "每日提醒" } }
+      }
     },
     "Done" : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "完成" } }
+      }
     },
     "Enable notifications for Brilliancy in iOS Settings to get the daily reminder." : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "请在 iOS 设置中允许 Brilliancy 发送通知,以接收每日提醒。" } }
+      }
     },
     "Enjoyed today's game? The full library unlocks more master games like this, with AI insights on every move." : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "喜欢今天的对局?完整题库解锁更多这样的大师名局,每一步都有 AI 讲解。" } }
+      }
     },
     "Explore the library" : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "探索题库" } }
+      }
     },
     "FEN" : {
 
     },
     "GUESS RATING" : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "棋感评分" } }
+      }
     },
     "Game complete" : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "本局完成" } }
+      }
     },
     "Guess Rating %arg" : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "棋感评分 %arg" } }
+      }
     },
     "Guess the master's move" : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "猜出大师的着法" } }
+      }
     },
     "LIBRARY" : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "题库" } }
+      }
     },
     "Learn from every move" : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "从每一步中学习" } }
+      }
     },
     "Load FEN" : {
 
     },
     "Loading plans…" : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在加载方案…" } }
+      }
     },
     "Master played %arg" : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "大师走的是 %arg" } }
+      }
     },
     "Match!" : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "命中!" } }
+      }
     },
     "Move %arg" : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "第 %arg 回合" } }
+      }
     },
     "Next" : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "下一步" } }
+      }
     },
     "No games available — check your connection." : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "暂无对局——请检查网络连接。" } }
+      }
     },
     "No games available." : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "暂无对局。" } }
+      }
     },
     "Not just right or wrong." : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "不只是对与错。" } }
+      }
     },
     "Notifications" : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "通知" } }
+      }
     },
     "Notifications are off" : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "通知未开启" } }
+      }
     },
     "OK" : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "好" } }
+      }
     },
     "One local notification a day when a new challenge is ready. Nothing leaves your device." : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "每天一条本地通知,提醒你新挑战已就绪。任何数据都不会离开你的设备。" } }
+      }
     },
     "Outguess the legends." : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "与传奇过招。" } }
+      }
     },
     "PACKS" : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "题包" } }
+      }
     },
     "Pieces: cburnett by Colin M.L. Burnett · CC BY-SA 3.0" : {
 
     },
     "Plan" : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "方案" } }
+      }
     },
     "Play one master game a day and guess the next move yourself." : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "每天一盘大师名局,亲手猜出他的下一步。" } }
+      }
     },
     "Play today's game" : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "开始今日对局" } }
+      }
     },
     "Progress" : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "进步" } }
+      }
     },
     "Rating history and your strengths & weaknesses by theme appear here as you play." : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "随着你不断练习,这里会出现评分曲线和分类强弱项。" } }
+      }
     },
     "Reset" : {
 
     },
     "Restore purchases" : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "恢复购买" } }
+      }
     },
     "Score %arg" : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "得分 %arg" } }
+      }
     },
     "See how your chess sense is growing" : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "看见你的棋感在成长" } }
+      }
     },
     "Settings" : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "设置" } }
+      }
     },
     "Share" : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "分享" } }
+      }
     },
     "Side to move: %arg" : {
 
     },
     "Start your streak — one brilliant game a day." : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "开始你的连胜——每天一局精彩名局。" } }
+      }
     },
     "That didn't go through" : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "未能完成" } }
+      }
     },
     "The purchase couldn't be completed and you weren't charged. Please try again." : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "购买未能完成,你没有被扣费。请重试。" } }
+      }
     },
     "Time" : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "时间" } }
+      }
     },
     "Today" : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "今日" } }
+      }
     },
     "Today's game is ready." : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "今天的对局已就位。" } }
+      }
     },
     "Train" : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "训练" } }
+      }
     },
     "Unlock" : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "解锁" } }
+      }
     },
     "Version" : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "版本" } }
+      }
     },
     "You play %arg (%arg)." : {
       "localizations" : {
@@ -231,10 +331,14 @@
       }
     },
     "You played %arg" : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "你走的是 %arg" } }
+      }
     },
     "Your guess rating, streaks, and strengths & weaknesses by theme — part of the full library." : {
-
+      "localizations" : {
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "棋感评分、连胜与分类强弱项——完整题库的一部分。" } }
+      }
     },
     "—" : {
 

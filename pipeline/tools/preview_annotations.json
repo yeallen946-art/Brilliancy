@@ -21,7 +21,7 @@
         }
       },
       "21": {
-        "annotation": "Bd8# - the bishop delivers mate while the rook covers the king's escape squares, and the queen sacrifice is fully repaid. The quiet tries instead simply lose: the attack evaporates and Black takes over.",
+        "annotation": "Bd8# - the bishop delivers mate while the rook covers the king's escape squares, and the queen sacrifice is fully repaid. The mate was forced either way: had the king stepped back instead, the rook would have landed the mate on the same square. The quiet tries simply lose: the attack evaporates and Black takes over.",
         "alt_annotations": {
           "g5e3": "Be3 trades blows and leaves Black clearly winning - the moment for the finish is gone.",
           "g1f3": "Nf3 lets Black force a queen trade and grab the bishop; the endgame is lost for White.",

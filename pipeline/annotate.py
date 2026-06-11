@@ -239,6 +239,29 @@ def build_move_prompt(game: GameRecord, move: MoveRecord, lang: str = "en") -> s
             lines.append(f"           MATE FACTS: checking piece(s): {', '.join(pattern.checkers)}; "
                          f"escape squares covered by: {', '.join(pattern.supporters) or 'none needed'}")
 
+    # BRANCH FACTS: when THIS move delivers mate and the hero's PREVIOUS move was a
+    # forced mate-in-two, list every defense + its mate so the prose can honestly say
+    # "every retreat lost" (Jerry 2026-06-11: Réti has Kc7->Bd8# AND Ke8->Rd8#).
+    # Only at the FINAL mate — earlier plies would spoil still-unguessed moves.
+    if facts.mate_pattern(move.fen_before, move.uci).is_mate:
+        prior = next((m for m in reversed(game.moves)
+                      if m.ply < move.ply - 1 and m.mover == move.mover), None)
+        if prior is not None:
+            branches = facts.mate_in_two_defenses(prior.fen_before, prior.uci)
+            if len(branches) > 1:
+                lines += ["", "BRANCH FACTS (the game is over after this move; nothing left "
+                              "to spoil): one move earlier the mate was already forced in "
+                              "every variation. Defenses and their mates:"]
+                for b in branches:
+                    lines.append(
+                        f"  reply {b['reply_san']} -> {b['mate_san']} "
+                        f"(checkers: {', '.join(b['checkers'])}; "
+                        f"covers: {', '.join(b['supporters']) or 'none needed'})")
+                lines.append(
+                    "  You may say every defense lost and credit ONLY the pieces listed "
+                    "above; describe the opponent's alternative replies in words, never "
+                    "in notation.")
+
     rights = facts.opponent_castling_rights(move.fen_before, move.uci)
     if rights is not None:
         sides = [s for s, ok in (("kingside", rights["kingside"]),

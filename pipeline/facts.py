@@ -214,6 +214,45 @@ def _is_skewer(board: chess.Board, to_sq: int, opponent: bool) -> bool:
     return False
 
 
+def mate_in_two_defenses(fen_before: str, uci: str) -> list[dict]:
+    """If `uci` forces mate in two (EVERY defense allows an immediate mate),
+    enumerate each defense with its mating move and pattern. [] when not a forced
+    mate-in-two. Lets the FINAL move's annotation honestly say "every defense
+    lost" with the pieces credited per branch (Jerry 2026-06-11: Réti m10 has
+    Kc7->Bd8# AND Ke8->Rd8#; the engine PV only ever shows one line).
+    """
+    board = chess.Board(fen_before)
+    try:
+        move = chess.Move.from_uci(uci)
+        if not board.is_legal(move):
+            return []
+        board.push(move)
+    except (ValueError, AssertionError):
+        return []
+    defenses: list[dict] = []
+    for reply in list(board.legal_moves):
+        reply_san = board.san(reply)
+        after_reply = board.copy()
+        after_reply.push(reply)
+        mate = None
+        for candidate in after_reply.legal_moves:
+            probe = after_reply.copy()
+            probe.push(candidate)
+            if probe.is_checkmate():
+                mate = (after_reply.san(candidate),
+                        mate_pattern(after_reply.fen(), candidate.uci()))
+                break
+        if mate is None:
+            return []   # a defense survives -> not forced M2
+        defenses.append({
+            "reply_san": reply_san,
+            "mate_san": mate[0],
+            "checkers": mate[1].checkers,
+            "supporters": mate[1].supporters,
+        })
+    return defenses
+
+
 def opponent_castling_rights(fen_before: str, uci: str) -> dict | None:
     """Castling rights of the side to move AFTER `uci` (i.e. the mover's opponent).
 
