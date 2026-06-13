@@ -19,7 +19,7 @@ CREATE TABLE games (
     id TEXT PRIMARY KEY,
     white TEXT, black TEXT, event TEXT, year INTEGER, result TEXT, eco TEXT,
     hero_color TEXT, title TEXT, narrative_intro TEXT, pack_id TEXT, ply_count INTEGER,
-    title_zh TEXT, narrative_intro_zh TEXT
+    title_zh TEXT, narrative_intro_zh TEXT, is_sample INTEGER
 );
 CREATE TABLE moves (
     game_id TEXT, ply INTEGER, san TEXT, uci TEXT, fen_before TEXT,
@@ -31,7 +31,7 @@ CREATE TABLE moves (
 );
 CREATE TABLE packs (
     id TEXT PRIMARY KEY, name TEXT, kind TEXT, description TEXT,
-    price_tier TEXT, sort_order INTEGER
+    price_tier TEXT, sort_order INTEGER, promise TEXT
 );
 """
 
@@ -89,10 +89,10 @@ def build_sqlite(games: list[GameRecord], db_path: str, packs: list[dict] | None
         conn.executescript(SCHEMA)
         for g in games:
             conn.execute(
-                "INSERT INTO games VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT INTO games VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (g.id, g.white, g.black, g.event, g.year, g.result, g.eco,
                  g.hero_color, g.title, g.narrative_intro, g.pack_id, g.ply_count,
-                 g.title_zh, g.narrative_intro_zh),
+                 g.title_zh, g.narrative_intro_zh, 1 if g.is_sample else 0),
             )
             conn.executemany(
                 "INSERT INTO moves VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
@@ -100,9 +100,10 @@ def build_sqlite(games: list[GameRecord], db_path: str, packs: list[dict] | None
             )
         for p in packs or []:
             conn.execute(
-                "INSERT INTO packs VALUES (?,?,?,?,?,?)",
+                "INSERT INTO packs VALUES (?,?,?,?,?,?,?)",
                 (p["id"], p["name"], p["kind"], p.get("description", ""),
-                 p.get("price_tier", "premium"), p.get("sort_order", 0)),
+                 p.get("price_tier", "premium"), p.get("sort_order", 0),
+                 p.get("promise", "")),
             )
         conn.commit()
     finally:

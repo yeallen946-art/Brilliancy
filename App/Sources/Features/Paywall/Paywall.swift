@@ -9,11 +9,14 @@ enum FreeTier {
     /// PRD §7: the free tier includes 3 sample games with full annotations.
     static let sampleGameCount = 3
 
-    /// The free slice of the library, by library order (= stable game-id order).
-    /// A curated `is_sample` flag in content.sqlite can replace this rule later
-    /// without touching the gating call sites.
+    /// The free slice of the library (TECH_SPEC §6): the human-curated `is_sample`
+    /// games (a conversion "showroom", marked via content/curation/sample.txt). If a
+    /// DB predates marking and nothing is flagged, fall back to the first N by library
+    /// order so the free tier is never empty.
     static func unlockedGameIDs(in library: [GameContent]) -> Set<String> {
-        Set(library.prefix(sampleGameCount).map(\.id))
+        let marked = library.filter(\.isSample)
+        if !marked.isEmpty { return Set(marked.map(\.id)) }
+        return Set(library.prefix(sampleGameCount).map(\.id))
     }
 }
 

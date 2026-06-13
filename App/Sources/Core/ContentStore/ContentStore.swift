@@ -60,7 +60,8 @@ enum ContentStore {
                 kind: row["kind"] ?? "theme",
                 description: row["description"] ?? "",
                 priceTier: row["price_tier"] ?? "premium",
-                sortOrder: row["sort_order"] ?? 0
+                sortOrder: row["sort_order"] ?? 0,
+                promise: row["promise"] ?? ""
             )
         }
     }
@@ -80,6 +81,7 @@ enum ContentStore {
             let heroColor: String? = gameRow["hero_color"]
             return GameContent(
                 packId: gameRow["pack_id"],
+                isSample: (gameRow["is_sample"] as Int? ?? 0) == 1,
                 id: id,
                 white: gameRow["white"] ?? "Unknown",
                 black: gameRow["black"] ?? "Unknown",

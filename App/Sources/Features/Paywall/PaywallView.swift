@@ -26,9 +26,14 @@ struct PaywallView: View {
                     Spacer()
                 }
 
-                Text("Learn from every move")
+                Text(headline)
                     .font(.system(size: 26, weight: .medium))
                     .foregroundStyle(Theme.textPrimary)
+                    .multilineTextAlignment(.center)
+
+                Text(subcopy)
+                    .font(.system(size: 14))
+                    .foregroundStyle(Theme.textSecondary)
                     .multilineTextAlignment(.center)
 
                 VStack(alignment: .leading, spacing: Theme.Space.xs) {
@@ -75,6 +80,33 @@ struct PaywallView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text("The purchase couldn't be completed and you weren't charged. Please try again.")
+        }
+    }
+
+    // MARK: - Trigger-specific copy (TECH_SPEC §6)
+
+    /// Headline framed by where the paywall was summoned from, so the pitch matches
+    /// the user's intent rather than a single generic line. The benefit list below
+    /// stays constant.
+    private var headline: String {
+        switch trigger {
+        case .postDaily:       return "Want the full breakdown?"
+        case .lockedGame:      return "Train these patterns in full"
+        case .lockedProgress:  return "See your chess sense grow"
+        case .lockedArchive:   return "Replay every daily"
+        }
+    }
+
+    private var subcopy: String {
+        switch trigger {
+        case .postDaily:
+            return "See the engine line and coach explanation for every move \u{2014} and play the full library of master games."
+        case .lockedGame:
+            return "Unlock every master game in the library, each with AI insight on why the move works."
+        case .lockedProgress:
+            return "Unlock your guess-rating history and strengths & weaknesses by theme."
+        case .lockedArchive:
+            return "Unlock the full archive of past daily challenges, plus the master library."
         }
     }
 

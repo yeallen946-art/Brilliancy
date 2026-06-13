@@ -100,6 +100,31 @@ final class GuessSessionTests: XCTestCase {
         XCTAssertEqual(model.currentMove?.san, "Nxe4") // ply 26, the next guess point
     }
 
+    func testWeakestResultAndRedCountDriveUpsell() throws {
+        // One miss (ply 22) then a correct move (ply 26): the upsell should point at
+        // the miss (TECH_SPEC §6 dynamic post-daily card).
+        let model = makeModel()
+        model.begin()
+        drainAutoplay(model)
+        model.submitGuess(from: try XCTUnwrap(Sq(name: "a7")), to: try XCTUnwrap(Sq(name: "a6"))) // 0 pts, red
+        model.proceed()
+        drainAutoplay(model)
+        let next = try XCTUnwrap(model.currentMove)
+        let parsed = try XCTUnwrap(ChessGame.parse(uci: next.uci))
+        model.submitGuess(from: parsed.from, to: parsed.to)                                       // 100 pts
+
+        let weakest = try XCTUnwrap(model.weakestResult)
+        XCTAssertEqual(weakest.ply, 22)
+        XCTAssertEqual(weakest.evaluation.displayPoints, 0)
+        XCTAssertEqual(model.redMissCount, 1)
+        XCTAssertEqual(model.moveNumber(forPly: 22), 11)
+    }
+
+    func testWeakestResultIsNilWithNoGuesses() {
+        XCTAssertNil(makeModel().weakestResult)
+        XCTAssertEqual(makeModel().redMissCount, 0)
+    }
+
     func testPlayingAllMasterMovesReachesPerfectSummary() {
         let model = makeModel()
         model.begin()

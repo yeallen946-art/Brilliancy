@@ -58,6 +58,14 @@ def main() -> int:
         print(f"Packs: {', '.join(p['id'] for p in packs)} "
               f"({len(pack_by_game)} game assignment(s)).")
 
+    # Free-tier samples (TECH_SPEC §6): curated showroom, set in-memory like pack_id.
+    sample_ids = store.load_sample_ids()
+    for g in games:
+        g.is_sample = g.id in sample_ids
+    if sample_ids:
+        present = sum(1 for g in games if g.is_sample)
+        print(f"Free-tier samples: {present} of {len(sample_ids)} marked id(s) present.")
+
     # Safety gate 1: no empty / partly-annotated games may ship (reviewer guard, A/D).
     blockers = [(g.id, r) for g in games for r in [unshippable_reasons(g)] if r]
     if blockers:

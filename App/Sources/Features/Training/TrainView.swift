@@ -102,6 +102,15 @@ struct TrainView: View {
                     .font(.system(size: 11))
                     .foregroundStyle(Theme.textSecondary)
                     .lineLimit(2)
+                // Skill promise (TECH_SPEC §6): sell what they get better at, not the
+                // game list. Shown only when curation supplies one.
+                if !pack.promise.isEmpty {
+                    Text(pack.promise)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Theme.gold)
+                        .lineLimit(2)
+                        .padding(.top, 1)
+                }
             }
             Spacer()
             Image(systemName: "chevron.right")

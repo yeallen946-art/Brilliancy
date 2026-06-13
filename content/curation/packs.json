@@ -4,6 +4,7 @@
     "name": "Immortal Classics",
     "kind": "theme",
     "description": "The most celebrated attacking masterpieces in chess history.",
+    "promise": "Learn to spot sacrifices before they work.",
     "price_tier": "premium",
     "sort_order": 0,
     "game_ids": [

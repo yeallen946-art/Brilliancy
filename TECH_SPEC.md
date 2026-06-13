@@ -259,8 +259,10 @@ Operating rules:
 
 - StoreKit 2, products: `sub.monthly` ($4.99), `sub.annual` ($29.99, 7-day trial), `lifetime` ($49.99 non-consumable).
 - Entitlement check: `Transaction.currentEntitlements` on launch + listener. Single `EntitlementStore` observable, injected; **all gating goes through one `isPremium` flag** — no scattered checks.
-- Free tier: daily challenge (today only), 3 marked sample games, scoring without annotations beyond first game (exact gating per PRD §7).
-- Paywall triggers: post-daily-challenge upsell, locked pack tap, locked archive tap.
+- Free tier: daily challenge (today only), 3 marked sample games, scoring without annotations beyond first game (exact gating per PRD §7). The 3 sample games are **curated, not the first 3 by id order**: marked by an `is_sample` flag on the games row, set from `content/curation/sample.txt` (tracked, same mechanism as packs/selection). `FreeTier.unlockedGameIDs` returns the marked games; if none are marked it falls back to the first N by library order (safety for a DB built before any marking).
+- Paywall triggers: post-daily-challenge upsell, locked pack tap, locked progress tap, locked archive tap. The paywall **personalizes by trigger** (`PaywallTrigger` headline + subcopy): `postDaily` invites the full per-move breakdown + library; `lockedGame` frames training the master patterns; `lockedProgress` frames the rating/streak/weakness payoff; `lockedArchive` frames the daily archive. The shared benefit list stays beneath the trigger-specific header. (Follow-up: name the specific pack/game tapped — needs a context value threaded through the `paywall` sheet state, today only the `PaywallTrigger` enum is passed.) Any per-move explanation shown as a teaser MUST be real pipeline annotation text (hard rule #1) — never a freestyle teaser.
+- Post-daily summary upsell card (S3): **dynamic**, grounded in the just-finished session — it names the user's weakest guess point ("Move N scored X/100", using the mean-of-points model of §3.2; never an invented "cost you N points" subtraction) and, when there are multiple red-band misses, their count. Coach tone (PRD §5): an invitation to see the engine line + explanation, never a scold.
+- Pack cards (S5) may carry a short **skill-promise** line (`promise` column on the packs row) — what the user gets better AT, not just the game list (PRD §7: the value is improvement, not more games). Display-only; absent → omitted.
 - Use SubscriptionStoreView where possible; App Store Small Business Program (15%).
 
 ## 7. Share Card

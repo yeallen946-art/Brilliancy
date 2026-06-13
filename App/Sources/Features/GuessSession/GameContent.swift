@@ -7,6 +7,9 @@ struct GameContent: Identifiable {
     /// Pack membership (S5/S6); nil for unpacked games. Declared first so the
     /// memberwise init keeps existing call sites (which omit it) unchanged.
     var packId: String? = nil
+    /// Curated free-tier sample (TECH_SPEC §6). Defaulted like packId so existing
+    /// call sites / Swift literals that omit it stay valid.
+    var isSample: Bool = false
     let id: String
     let white: String
     let black: String
@@ -105,6 +108,9 @@ struct ContentPack: Identifiable {
     let description: String
     let priceTier: String     // free | premium (display only; gating stays per-game)
     let sortOrder: Int
+    /// Short skill-promise (TECH_SPEC §6): what the user gets better AT. Empty = none.
+    /// Defaulted so call sites that predate the field stay valid.
+    var promise: String = ""
 }
 
 /// Weakness-breakdown tags (TECH_SPEC §3.3).

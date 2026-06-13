@@ -1,0 +1,13 @@
+# Free-tier sample games (TECH_SPEC §6) — the conversion "showroom".
+# One game id per line; '#' starts a comment. 7_build sets games.is_sample from this.
+# Empty / missing file → app falls back to the first 3 by library order.
+#
+# Curate as a funnel, not by library order (the seed reviewer's call to tune):
+#   1) a satisfying, easy-to-hit game  → build a sense of achievement
+#   2) a commonly-missed game with a sharp explanation → show the annotation's value
+#   3) a game that leaves obvious "I want more" → point toward a premium pack
+#
+# Default trio below — adjust after the reviewer plays them.
+morphy-isouard-1858-f7f676        # Opera Game: clean, easy hits, classic "wow"
+byrne-fischer-1956-8c3723         # Game of the Century: dramatic, rewards the explanation
+anderssen-kieseritzky-1851-f5495f # Immortal Game: sacrificial fireworks → attacking pack

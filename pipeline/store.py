@@ -69,6 +69,9 @@ class GameRecord:
     # Chinese narrative fields (PRD §12.1), filled by a zh annotate run.
     title_zh: str | None = None
     narrative_intro_zh: str | None = None
+    # Curated free-tier sample (TECH_SPEC §6): set at build time from
+    # content/curation/sample.txt, not persisted in the work store (like pack_id).
+    is_sample: bool = False
     moves: list[MoveRecord] = field(default_factory=list)
 
     @property
@@ -177,5 +180,21 @@ def load_selected(path: str = SELECTED_FILE) -> set[str] | None:
     """The human's curated game ids (TECH_SPEC §5 stage 2). None = no selection (use all)."""
     if not os.path.exists(path):
         return None
+    with open(path, encoding="utf-8") as fh:
+        return parse_selected(fh.read())
+
+
+# ------------------------------------------------------------ free-tier samples
+# Tracked list of game ids the free tier unlocks (TECH_SPEC §6): a curated
+# conversion "showroom", NOT the first 3 by id order. 7_build sets game.is_sample.
+
+SAMPLE_FILE = os.path.join(CURATION_DIR, "sample.txt")
+
+
+def load_sample_ids(path: str = SAMPLE_FILE) -> set[str]:
+    """Game ids marked as free-tier samples. Empty set if no file (app falls back
+    to first-N gating). Same one-id-per-line/'#'-comment format as selected.txt."""
+    if not os.path.exists(path):
+        return set()
     with open(path, encoding="utf-8") as fh:
         return parse_selected(fh.read())

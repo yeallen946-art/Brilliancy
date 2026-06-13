@@ -31,7 +31,20 @@ final class EntitlementTests: XCTestCase {
 
     // MARK: - FreeTier
 
-    func testFreeTierUnlocksFirstThreeGames() {
+    func testFreeTierUnlocksMarkedSamples() {
+        // Curated samples win regardless of library order (TECH_SPEC §6).
+        let library = [
+            makeGame(id: "game-1"),
+            makeGame(id: "game-2", isSample: true),
+            makeGame(id: "game-3"),
+            makeGame(id: "game-4", isSample: true),
+            makeGame(id: "game-5"),
+        ]
+        XCTAssertEqual(FreeTier.unlockedGameIDs(in: library), ["game-2", "game-4"])
+    }
+
+    func testFreeTierFallsBackToFirstThreeWhenNoneMarked() {
+        // DB predating is_sample marking: free tier is never empty.
         let library = (1...5).map { makeGame(id: "game-\($0)") }
         let unlocked = FreeTier.unlockedGameIDs(in: library)
         XCTAssertEqual(unlocked, ["game-1", "game-2", "game-3"])
@@ -48,8 +61,9 @@ final class EntitlementTests: XCTestCase {
 
     // MARK: - Fixtures
 
-    private func makeGame(id: String) -> GameContent {
+    private func makeGame(id: String, isSample: Bool = false) -> GameContent {
         GameContent(
+            isSample: isSample,
             id: id,
             white: "White",
             black: "Black",

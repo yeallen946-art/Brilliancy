@@ -783,6 +783,45 @@ def test_load_selected_reads_ids(tmp_path):
     assert store.load_selected(path) == {"a-1", "b-2"}
 
 
+# ----------------------------------------------------- free-tier samples (§6)
+
+def test_load_sample_ids_missing_file_is_empty(tmp_path):
+    assert store.load_sample_ids(os.path.join(tmp_path, "nope.txt")) == set()
+
+
+def test_load_sample_ids_reads_ids(tmp_path):
+    path = os.path.join(tmp_path, "sample.txt")
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write("morphy-1858  # showroom\n# comment\nfischer-1956\n")
+    assert store.load_sample_ids(path) == {"morphy-1858", "fischer-1956"}
+
+
+def test_build_sqlite_persists_is_sample(tmp_path):
+    import sqlite3
+    g = _approved_game()
+    g.is_sample = True
+    db = os.path.join(tmp_path, "content.sqlite")
+    build.build_sqlite([g], db)
+    conn = sqlite3.connect(db)
+    try:
+        flag, = conn.execute("SELECT is_sample FROM games WHERE id = ?", (g.id,)).fetchone()
+        assert flag == 1
+    finally:
+        conn.close()
+
+
+def test_build_sqlite_default_is_sample_is_zero(tmp_path):
+    import sqlite3
+    db = os.path.join(tmp_path, "content.sqlite")
+    build.build_sqlite([_approved_game()], db)   # is_sample defaults False
+    conn = sqlite3.connect(db)
+    try:
+        flag, = conn.execute("SELECT is_sample FROM games").fetchone()
+        assert flag == 0
+    finally:
+        conn.close()
+
+
 # ------------------------------------------------------------- review decisions
 
 def test_decisions_roundtrip_and_overwrite(tmp_path):

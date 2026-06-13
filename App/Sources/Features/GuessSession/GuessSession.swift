@@ -176,6 +176,22 @@ final class GuessSessionModel {
     /// Per-guess-point bands in play order (for the emoji row / share card).
     var bands: [ScoreBand] { results.map { $0.evaluation.band } }
 
+    /// The guess point the user did worst on (lowest display points) — drives the
+    /// dynamic post-daily upsell (TECH_SPEC §6). nil if no guesses; ties → earliest ply.
+    var weakestResult: PointResult? {
+        results.min {
+            $0.evaluation.displayPoints != $1.evaluation.displayPoints
+                ? $0.evaluation.displayPoints < $1.evaluation.displayPoints
+                : $0.ply < $1.ply
+        }
+    }
+
+    /// Number of red-band misses, for "N critical misses to review" copy.
+    var redMissCount: Int { results.filter { $0.evaluation.band == .red }.count }
+
+    /// 1-based "Move N" (move-pair terms) for any ply — same rule as `currentMoveNumber`.
+    func moveNumber(forPly ply: Int) -> Int { (ply + 1) / 2 }
+
     /// Hit-rate per tag. "Hit" = green band. Returned in a stable tag order.
     func tagBreakdown() -> [TagStat] {
         var totals: [GuessTag: (hits: Int, total: Int)] = [:]

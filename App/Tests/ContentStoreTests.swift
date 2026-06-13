@@ -14,7 +14,7 @@ final class ContentStoreTests: XCTestCase {
                     id TEXT PRIMARY KEY,
                     white TEXT, black TEXT, event TEXT, year INTEGER, result TEXT, eco TEXT,
                     hero_color TEXT, title TEXT, narrative_intro TEXT, pack_id TEXT, ply_count INTEGER,
-                    title_zh TEXT, narrative_intro_zh TEXT
+                    title_zh TEXT, narrative_intro_zh TEXT, is_sample INTEGER
                 );
                 CREATE TABLE moves (
                     game_id TEXT, ply INTEGER, san TEXT, uci TEXT, fen_before TEXT,
@@ -26,19 +26,19 @@ final class ContentStoreTests: XCTestCase {
                 );
                 CREATE TABLE packs (
                     id TEXT PRIMARY KEY, name TEXT, kind TEXT, description TEXT,
-                    price_tier TEXT, sort_order INTEGER
+                    price_tier TEXT, sort_order INTEGER, promise TEXT
                 );
                 """)
             try db.execute(
                 sql: """
                 INSERT INTO games VALUES
                 ('g1', 'White, W.', 'Black, B.', 'Test', 1910, '1-0', 'B15',
-                 'white', 'Test Game', 'An intro.', 'p1', 2, NULL, NULL)
+                 'white', 'Test Game', 'An intro.', 'p1', 2, NULL, NULL, 1)
                 """)
             try db.execute(
                 sql: """
                 INSERT INTO packs VALUES
-                ('p1', 'Test Pack', 'theme', 'A pack.', 'premium', 0)
+                ('p1', 'Test Pack', 'theme', 'A pack.', 'premium', 0, 'Sharpen your tactics.')
                 """)
             try db.execute(
                 sql: """
@@ -69,6 +69,7 @@ final class ContentStoreTests: XCTestCase {
         XCTAssertEqual(game.heroColor, .white)
         XCTAssertEqual(game.heroDisplayName, "White")
         XCTAssertEqual(game.packId, "p1")
+        XCTAssertTrue(game.isSample)               // is_sample = 1 in the fixture
         XCTAssertEqual(game.moves.count, 2)
         XCTAssertEqual(game.startFen, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
         XCTAssertEqual(game.guessPointCount, 1)
@@ -123,6 +124,7 @@ final class ContentStoreTests: XCTestCase {
         XCTAssertEqual(pack.name, "Test Pack")
         XCTAssertEqual(pack.kind, "theme")
         XCTAssertEqual(pack.priceTier, "premium")
+        XCTAssertEqual(pack.promise, "Sharpen your tactics.")
     }
 
     func testJsonHelpersTolerateGarbage() {
