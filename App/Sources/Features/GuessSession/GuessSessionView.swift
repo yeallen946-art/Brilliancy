@@ -96,7 +96,9 @@ struct GuessSessionView: View {
             Text(model.game.narrativeIntro)
                 .font(.system(size: 13)).foregroundStyle(Theme.textSecondary)
                 .lineSpacing(5).multilineTextAlignment(.center)
-            Button("Begin") { model.begin() }.buttonStyle(GoldButtonStyle())
+            Button("Begin") { model.begin() }
+                .buttonStyle(GoldButtonStyle())
+                .accessibilityIdentifier("beginSessionButton")
         }
     }
 

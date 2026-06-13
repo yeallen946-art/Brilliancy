@@ -51,7 +51,7 @@ final class GuessRevealUITests: XCTestCase {
         XCTAssertTrue(operaRow.waitForExistence(timeout: 10), "Opera game row should be listed")
         operaRow.tap()
 
-        let begin = app.buttons["Begin"]
+        let begin = app.buttons["beginSessionButton"]
         XCTAssertTrue(begin.waitForExistence(timeout: 10), "context screen should offer Begin")
         begin.tap()
 
@@ -100,7 +100,7 @@ final class GuessRevealUITests: XCTestCase {
         XCTAssertTrue(fixtureRow.waitForExistence(timeout: 10), "fixture game should be listed")
         fixtureRow.tap()
 
-        let begin = app.buttons["Begin"]
+        let begin = app.buttons["beginSessionButton"]
         XCTAssertTrue(begin.waitForExistence(timeout: 10))
         begin.tap()
 

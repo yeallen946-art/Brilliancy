@@ -11,6 +11,7 @@ enum UITestFixtures {
     /// One guess point at ply 1: master e4 (+0.30), Nf3 tied within the engine-top
     /// tolerance (+0.25) -> guessing Nf3 must show the POSITIVE explanation card.
     static let equalGuessGame = GameContent(
+        isSample: true,
         id: "uitest-equal-guess",
         white: "Fixture White",
         black: "Fixture Black",
