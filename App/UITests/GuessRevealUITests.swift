@@ -77,8 +77,8 @@ final class GuessRevealUITests: XCTestCase {
                       "weaker guess must get an explanation card")
 
         let points = app.staticTexts
-            .containing(NSPredicate(format: "label BEGINSWITH '+'")).firstMatch
-        XCTAssertTrue(points.exists, "banner should show points earned, '+NN'")
+            .containing(NSPredicate(format: "label ENDSWITH '/100'")).firstMatch
+        XCTAssertTrue(points.exists, "banner should show the score, 'NN/100'")
 
         let master = app.staticTexts
             .containing(NSPredicate(format: "label BEGINSWITH 'Master played'")).firstMatch
@@ -122,7 +122,7 @@ final class GuessRevealUITests: XCTestCase {
         let praise = app.staticTexts
             .containing(NSPredicate(format: "label CONTAINS 'just as strong'")).firstMatch
         XCTAssertTrue(praise.exists, "engine-equal guess must be praised, not criticized")
-        XCTAssertTrue(app.staticTexts["+100"].exists,
+        XCTAssertTrue(app.staticTexts["100/100"].exists,
                       "engine-equal guess earns full points in the banner")
     }
 }

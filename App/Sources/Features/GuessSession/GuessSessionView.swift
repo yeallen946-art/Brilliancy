@@ -126,6 +126,9 @@ struct GuessSessionView: View {
             if let eval = model.lastEvaluation {
                 feedbackBanner(eval)
             }
+            if let delta = model.lastRatingDelta {
+                ratingDeltaReveal(delta)
+            }
             board(interactive: false, emphasis: revealEmphasis)
             if let explanation = model.guessExplanation {
                 guessCard(explanation)
@@ -155,17 +158,32 @@ struct GuessSessionView: View {
         HStack(spacing: Theme.Space.xs) {
             Text(eval.band.icon).font(.title2.weight(.medium))
             Text(eval.label).font(.system(size: 17, weight: .medium))
-            // Points earned, same unit as the summary score. (Previously this slot
-            // showed the raw eval delta in pawns, which read as a points deduction —
-            // and mate-clamped evals made it "(-297.0)". The pawn story now lives in
-            // the wrong-guess card, where it's mate-aware.)
-            Text("+\(eval.displayPoints)")
+            // Score out of 100, same unit as the summary score. "N/100" reads as a
+            // score, not a "+N" deduction (PRD §5 coach tone). Earlier this slot showed
+            // the raw eval delta in pawns, which read as a points loss — and mate-clamped
+            // evals made it "(-297.0)". The pawn story lives in the wrong-guess card,
+            // where it's mate-aware.
+            Text("\(eval.displayPoints)/100")
                 .font(.system(size: 13, weight: .medium))
         }
         .padding(.vertical, Theme.Space.xs).padding(.horizontal, Theme.Space.md)
         .background(bandColor(eval.band).opacity(0.18), in: Capsule())
         .foregroundStyle(bandColor(eval.band))
         .accessibilityIdentifier("feedbackPanel")
+    }
+
+    /// Per-move rating change, shown on the reveal so a miss is FELT here, not just as a
+    /// net delta at the summary (where wins can hide the drops). Rating tracks objective
+    /// quality, so a soft-looking score can still cost rating.
+    @ViewBuilder
+    private func ratingDeltaReveal(_ delta: Int) -> some View {
+        let color = delta > 0 ? Theme.feedbackGreen : delta < 0 ? Theme.feedbackRed : Theme.textSecondary
+        let arrow = delta > 0 ? "\u{25B2}" : delta < 0 ? "\u{25BC}" : "\u{2014}"
+        let amount = delta == 0 ? "even" : "\(arrow) \(delta > 0 ? "+" : "")\(delta)"
+        Text("Guess Rating \(amount)")
+            .font(.system(size: 13, weight: .medium))
+            .foregroundStyle(color)
+            .accessibilityIdentifier("ratingDeltaReveal")
     }
 
     private var annotationCard: some View {

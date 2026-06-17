@@ -64,9 +64,23 @@ enum GuessExplainer {
                 guessSan: guessSan,
                 guessEvalCp: guessEvalCp,
                 evalDeltaCp: evaluation.evalDeltaCp,
-                refutationSan: detail?.refutationSan ?? []
+                refutationSan: detail?.refutationSan ?? [],
+                onlyMoveHeld: onlyBestMoveHeld(point)
             )
         )
+    }
+
+    /// True when only the engine-best move avoided a blunder at this point — a genuinely
+    /// sharp position where a 0 is fair, not harsh. Grounded in the candidate evals (a
+    /// deterministic engine fact, like the score itself — not commentary, hard rule #1):
+    /// counts moves within the blunder threshold of best. Sparse/empty evals → false, so
+    /// we never claim sharpness we can't actually see (e.g. an M1 row with one candidate).
+    static func onlyBestMoveHeld(_ point: ContentMove) -> Bool {
+        guard let best = point.candidateEvals.values.max(),
+              point.candidateEvals.count >= 2 else { return false }
+        let threshold = ScoringConfig.default.bucketMistake
+        let held = point.candidateEvals.values.filter { best - $0 <= threshold }.count
+        return held <= 1
     }
 
     /// Engine-facts praise for an equal-or-better non-match. Coach tone, numbers only.
@@ -94,11 +108,13 @@ enum GuessExplainer {
         guessSan: String,
         guessEvalCp: Int?,
         evalDeltaCp: Int,
-        refutationSan: [String]
+        refutationSan: [String],
+        onlyMoveHeld: Bool = false
     ) -> String {
         let line = refutationSan.prefix(refutationMovesShown).joined(separator: " ")
 
-        // Mate-aware phrasing (clamped evals make pawn units meaningless here).
+        // Mate-aware phrasing (clamped evals make pawn units meaningless here). No sharp-
+        // spot prefix needed — a forced mate already says the position was decisive.
         if let eval = guessEvalCp, eval <= -mateThresholdCp {
             return line.isEmpty
                 ? "After \(guessSan), the engine finds a forced mate against you."
@@ -108,11 +124,14 @@ enum GuessExplainer {
             return "\(guessSan) lets a forced mate slip away \u{2014} the winning idea is still on the board."
         }
 
+        // Frame a fair 0: when only the top move held, say so (grounded fact) before the
+        // shortfall, so a low score reads as "this spot was sharp", not "you blundered".
+        let prefix = onlyMoveHeld ? "A sharp spot \u{2014} only the top move held here. " : ""
         let shortfall = String(format: "%.1f", Double(evalDeltaCp) / 100.0)
         if line.isEmpty {
-            return "After \(guessSan), the engine puts you about \(shortfall) pawns short of the best move here."
+            return prefix + "After \(guessSan), the engine puts you about \(shortfall) pawns short of the best move here."
         }
-        return "After \(guessSan), the strongest reply is \(line), leaving you about \(shortfall) pawns short of the best move here."
+        return prefix + "After \(guessSan), the strongest reply is \(line), leaving you about \(shortfall) pawns short of the best move here."
     }
 
     /// "+2.5" style signed pawn figure from a cp eval (mover's POV).

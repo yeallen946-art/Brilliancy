@@ -114,6 +114,28 @@ final class GuessExplainerTests: XCTestCase {
         XCTAssertFalse(explanation.text.contains(" z"), explanation.text)
     }
 
+    func testSharpSpotPrefixWhenOnlyBestMoveHeld() throws {
+        // Only the master move avoids a blunder (a2a3 is 4.3 pawns worse) -> the card
+        // frames the 0 as a sharp spot, grounded in the candidate evals.
+        let point = makePoint(
+            candidateEvals: ["e2e4": 30, "a2a3": -400],
+            candidateDetails: ["a2a3": CandidateDetail(san: "a3", refutationSan: ["e5"], motif: "blunder")]
+        )
+        let text = try XCTUnwrap(explain("a2a3", point: point)).text
+        XCTAssertTrue(text.contains("sharp spot"), text)
+        XCTAssertTrue(text.contains("4.3 pawns"), text)   // still states the engine fact
+    }
+
+    func testNoSharpSpotPrefixWhenOtherMovesHold() throws {
+        // a2a3 is only 1.2 pawns worse and within the non-blunder band -> not sharp.
+        let point = makePoint(
+            candidateEvals: ["e2e4": 30, "a2a3": -90, "b2b3": -100],
+            candidateDetails: ["a2a3": CandidateDetail(san: "a3", refutationSan: [], motif: "mistake")]
+        )
+        let text = try XCTUnwrap(explain("a2a3", point: point)).text
+        XCTAssertFalse(text.contains("sharp spot"), text)
+    }
+
     func testGuessSanFallsBackToUciWithoutEnrichment() throws {
         let point = makePoint(candidateEvals: ["e2e4": 30, "a2a3": -90])
         let explanation = try XCTUnwrap(explain("a2a3", point: point))

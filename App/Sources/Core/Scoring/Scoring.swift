@@ -156,7 +156,9 @@ enum Scoring {
         case config.pointsGood:       return "Good move"
         case config.pointsInaccuracy: return "Inaccuracy"
         case config.pointsMistake:    return "Mistake"
-        default:                      return "Blunder"
+        // Coach tone (PRD §5): the zero-point tier names the outcome, not a verdict
+        // on the player. "Blunder" read as scolding next to a "+0".
+        default:                      return "Missed it"
         }
     }
 }

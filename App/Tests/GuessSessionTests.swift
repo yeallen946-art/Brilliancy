@@ -65,6 +65,7 @@ final class GuessSessionTests: XCTestCase {
         XCTAssertEqual(model.lastEvaluation?.displayPoints, 100)
         XCTAssertEqual(model.lastEvaluation?.isMatch, true)
         XCTAssertGreaterThan(model.rating, model.startRating) // rating went up
+        XCTAssertGreaterThan(model.lastRatingDelta ?? 0, 0)   // and the gain is shown per move
     }
 
     func testWrongLegalGuessScoresLowAndDropsRating() throws {
@@ -80,6 +81,7 @@ final class GuessSessionTests: XCTestCase {
         XCTAssertEqual(model.results.first?.evaluation.displayPoints, 0)
         XCTAssertEqual(model.results.first?.evaluation.band, .red)
         XCTAssertLessThan(model.rating, model.startRating)
+        XCTAssertLessThan(model.lastRatingDelta ?? 0, 0)      // miss visibly costs rating
     }
 
     func testProceedReplaysMasterMoveThenAdvances() throws {
@@ -91,6 +93,7 @@ final class GuessSessionTests: XCTestCase {
 
         // proceed() re-enters autoplay; the FIRST tick plays the master move itself.
         XCTAssertEqual(model.phase, .autoplaying)
+        XCTAssertNil(model.lastRatingDelta)   // per-move delta cleared on advance
         let indexBefore = model.index
         model.stepAutoplay()
         XCTAssertEqual(model.index, indexBefore + 1)

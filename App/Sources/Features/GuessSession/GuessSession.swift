@@ -45,6 +45,9 @@ final class GuessSessionModel {
     // Reveal state (valid while phase == .revealed).
     private(set) var lastEvaluation: GuessEvaluation?
     private(set) var lastGuessUci: String?
+    /// Rating change from THIS guess (rounded after − rounded before), so the reveal can
+    /// show the drop/gain per move instead of only the net delta at the summary.
+    private(set) var lastRatingDelta: Int?
 
     let startRating: Double
 
@@ -128,6 +131,7 @@ final class GuessSessionModel {
             config: config
         )
 
+        let ratingBefore = rating
         rating = GuessRating.updated(
             rating: rating,
             difficulty: point.difficulty,
@@ -135,6 +139,7 @@ final class GuessSessionModel {
             priorGuessCount: results.count,
             config: config
         )
+        lastRatingDelta = Int(rating.rounded()) - Int(ratingBefore.rounded())
 
         results.append(PointResult(
             ply: point.ply,
@@ -157,6 +162,7 @@ final class GuessSessionModel {
         guard phase == .revealed, currentMove != nil else { return }
         lastEvaluation = nil
         lastGuessUci = nil
+        lastRatingDelta = nil
         phase = .autoplaying
         // Note: no settle here — the move at `index` IS a guess point (the revealed
         // one); the first stepAutoplay() applies it and moves past.

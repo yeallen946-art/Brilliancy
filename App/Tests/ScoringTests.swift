@@ -64,6 +64,7 @@ final class ScoringTests: XCTestCase {
         let red = Scoring.evaluate(guessUci: "g", masterUci: "m", candidateEvals: ["m": 0, "g": -400])
         XCTAssertEqual(red.displayPoints, 0)
         XCTAssertEqual(red.band, .red)
+        XCTAssertEqual(red.label, "Missed it", "zero-tier label is coach-toned, not 'Blunder'")
     }
 
     func testMissingMoveFallsBackToBlunder() {
