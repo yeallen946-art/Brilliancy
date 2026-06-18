@@ -163,7 +163,44 @@ final class GuessExplainerTests: XCTestCase {
             candidateDetails: ["a2a3": CandidateDetail(san: "a3", refutationSan: [], motif: "mistake")]
         )
         let text = try XCTUnwrap(explain("a2a3", point: point)).text
-        XCTAssertTrue(text.contains("forced mate slip"), text)
+        // a3 (+0.5, not winning) — teach the distinction: doesn't force mate because the
+        // defender has a way out; the master's move (a mate here) leaves none.
+        XCTAssertTrue(text.contains("doesn't force mate"), text)
+        XCTAssertTrue(text.contains("way out of the checkmate"), text)
+        XCTAssertTrue(text.contains("master's move leaves none"), text)
         XCTAssertFalse(text.contains("pawns"), text)
+    }
+
+    func testMateSlipTemplateOverridesAltProse() throws {
+        // A winning-but-not-mating guess that throws away a forced mate must surface the
+        // mate-aware template, NOT hand prose that calls it "still winning" — the Opera
+        // m16 Qb7 case (Jerry 2026-06-17). It must teach why it isn't mate (defender has a
+        // way out), acknowledge it stays winning, and never name the mating line.
+        let mating = ContentStore.mateBaseCp - 200   // master mates in 2
+        let point = makePoint(
+            candidateEvals: ["e2e4": mating, "b3b7": 314],   // +3.1, winning but not mate
+            candidateDetails: ["b3b7": CandidateDetail(san: "Qb7", refutationSan: ["f6"], motif: "best")],
+            altAnnotations: ["b3b7": "Qb7 keeps a winning position; the defense plays on."]
+        )
+        let text = try XCTUnwrap(explain("b3b7", point: point)).text
+        XCTAssertTrue(text.contains("is still winning"), text)
+        XCTAssertTrue(text.contains("doesn't force mate"), text)        // answers "why can't I mate?"
+        XCTAssertTrue(text.contains("way out of the checkmate"), text)  // the lesson
+        XCTAssertFalse(text.contains("winning position"), text)         // prose suppressed
+        XCTAssertFalse(text.contains("f6"), text)                       // mating idea not spoiled
+    }
+
+    func testGettingMatedTemplateOverridesAltProse() throws {
+        // Symmetric case: a guess that walks into a forced mate against the player gets the
+        // plain "forced mate against you" template, not softer prose.
+        let mated = -ContentStore.mateBaseCp + 200   // mated in 2
+        let point = makePoint(
+            candidateEvals: ["e2e4": 30, "g2g4": mated],
+            candidateDetails: ["g2g4": CandidateDetail(san: "g4", refutationSan: ["e6", "Qh4#"], motif: "blunder")],
+            altAnnotations: ["g2g4": "g4 loosens the kingside a touch."]
+        )
+        let text = try XCTUnwrap(explain("g2g4", point: point)).text
+        XCTAssertTrue(text.contains("forced mate against you"), text)
+        XCTAssertFalse(text.contains("loosens"), text)
     }
 }

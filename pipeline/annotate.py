@@ -12,6 +12,9 @@ via output_config.format (json_schema) / client.messages.parse.
 
 from __future__ import annotations
 
+import json
+import os
+
 import chess
 from pydantic import BaseModel, Field
 
@@ -57,8 +60,21 @@ HARD RULES (a validator rejects violations):
 - Only name a move in algebraic notation if it is a legal move for the side to move in
   THIS position (i.e. it appears in the candidate list). Describe the OPPONENT's replies
   in words, never in notation.
+- Never write a bare board square or coordinate in prose — the validator reads any
+  letter+number like "g5"/"d8" as a move and REJECTS the whole annotation. This is the
+  single most common failure, so be strict:
+    * a pawn/piece named by its square -> drop the square. Write "the pawn" or "the
+      queenside pawn", NEVER "the b5 pawn"; "the bishop", NEVER "the bishop on g5".
+    * a destination -> describe by role. Write "drops onto the back rank", NEVER "lands on d8".
+  Describe squares only by ROLE ("the back rank", "the long diagonal", "the escape squares").
+  A letter+number may appear ONLY inside a listed candidate MOVE's notation (e.g. Bg5+, Rd8#).
 - Do NOT claim a move "wins", "loses", "drops", or "hangs" material unless the supplied
   facts list a capture in that move's line. Material words must be backed by a listed capture.
+- Do NOT generalize about a CATEGORY of moves ("the other queen moves", "the quieter rook
+  moves", "the slow tries all keep the edge"): you are shown only the top candidates, not
+  every legal move, so a sweeping claim that a whole class keeps or loses the advantage is
+  ungrounded (most such moves are often far worse than the few you see). Characterize only
+  the specific alternatives listed in the data, by name.
 - When a mate is involved, the "MATE FACTS" line tells you exactly which pieces give check
   and which cover the escape squares. Credit ONLY those pieces — no others.
 - Interpretive color ("the defense is overloaded") is welcome, but its direction must match
@@ -86,7 +102,17 @@ SYSTEM_PROMPT_ZH = """\
   禁用"最佳""必胜""碾压"等说法。
 - 只有出现在候选着法列表中的着法才能用记谱法点名;着法记谱保留英文代数记谱法
   (如 Bg5+、O-O-O),不要翻译成中文记谱。对手的应着用文字描述,不用记谱。
+- 散文中绝不能出现单独的格子坐标——校验器会把任何"字母+数字"(如 g5、d8)当成着法
+  而拒绝整条讲解。这是最常见的失败,务必严格:
+    * 用格子称呼棋子/兵时,去掉格子:写"那个兵""后翼兵",绝不写"b5 兵";写"象",
+      绝不写"g5 的象"。
+    * 表示落点时,用作用描述:写"杀入底线",绝不写"落在 d8"。
+  只能用作用描述格子(如"底线""大斜线""逃格")。"字母+数字"只允许作为候选着法
+  列表里某一着的英文代数记谱出现(如 Bg5+、Rd8#)。
 - 除非该着法的变着数据中列有吃子,否则不得声称"得子""丢子""丢兵"等子力变化。
+- 不得对一整类着法笼统下结论(如"其余后的着法""慢一些的车着""那些缓手都保有优势"):
+  你只看到排名靠前的候选着法,并非全部合法着法,因此"某一类着法都保有/丢失优势"
+  这种泛泛之论缺乏依据(这类着法多半比你看到的差得多)。只针对数据中列出的具体着法逐一说明。
 - 涉及将杀时,"MATE FACTS"一行明确了哪些棋子参与将杀,只能归功于这些棋子。
 - 棋子与战术术语用以下对照,不得自创:兵/马/象/车/后/王;双吃(fork)、
   牵制(pin)、闪将(discovered check)、串击(skewer)。
@@ -137,6 +163,63 @@ def _strictify(node) -> None:
     elif isinstance(node, list):
         for value in node:
             _strictify(value)
+
+
+# ----------------------------------------------------------- OpenRouter (alt provider)
+# Stage 4 can run against OpenRouter instead of the Anthropic SDK (Jerry has no Anthropic
+# key locally). OpenRouter is OpenAI-compatible — synchronous /chat/completions with a
+# json_schema response_format, no batch endpoint. The HTTP call + key handling live in
+# 4_annotate.py; these importable helpers are the testable parts. Keys come from a
+# gitignored pipeline/.env, never from a memory file or source.
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+
+def load_dotenv(path: str) -> dict[str, str]:
+    """Minimal KEY=VALUE .env parser (no dependency). Sets parsed keys into os.environ
+    WITHOUT overriding values already in the real environment; returns what it parsed.
+    Missing file -> {}. Ignores blank lines, comments, and `export ` prefixes."""
+    parsed: dict[str, str] = {}
+    try:
+        with open(path, encoding="utf-8") as fh:
+            lines = fh.readlines()
+    except OSError:
+        return parsed
+    for raw in lines:
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        if line.startswith("export "):
+            line = line[len("export "):]
+        key, _, value = line.partition("=")
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if not key:
+            continue
+        parsed[key] = value
+        os.environ.setdefault(key, value)
+    return parsed
+
+
+def openrouter_request_body(model: str, system: str, user_content: str,
+                            schema_model: type[BaseModel], max_tokens: int) -> dict:
+    """OpenAI-compatible chat-completions body with strict json_schema structured output —
+    the same MoveAnnotationResult/GameIntroResult schema the Anthropic path enforces."""
+    return {
+        "model": model,
+        "max_tokens": max_tokens,
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user_content},
+        ],
+        "response_format": {
+            "type": "json_schema",
+            "json_schema": {
+                "name": schema_model.__name__,
+                "strict": True,
+                "schema": strict_json_schema(schema_model),
+            },
+        },
+    }
 
 
 # ------------------------------------------------------------------- prompt building
@@ -238,6 +321,22 @@ def build_move_prompt(game: GameRecord, move: MoveRecord, lang: str = "en") -> s
         if pattern.is_mate:
             lines.append(f"           MATE FACTS: checking piece(s): {', '.join(pattern.checkers)}; "
                          f"escape squares covered by: {', '.join(pattern.supporters) or 'none needed'}")
+
+    # MATE DISTANCE: the engine's forced-mate count is a fact the prose must not miscount
+    # (Jerry 2026-06-17: Réti move-10 #2 was narrated as "mate next move"=#1, off-by-one
+    # against move-9's "mate in three"). Surface the exact distance so the wording is honest.
+    master_mate = (move.legal_evals.get(move.uci) or {}).get("mate")
+    if isinstance(master_mate, int) and master_mate > 0:
+        lines += [
+            "",
+            f"MATE DISTANCE: the engine reads {master_san} as a FORCED MATE IN {master_mate}. "
+            f"If you state the distance, it must be exactly \"mate in {master_mate}\" "
+            f"(中文 \"{master_mate}步内将杀\"); \"next move\" / \"下一步\" means mate in one ONLY.",
+            f"Because {master_san} is a FORCED MATE, every alternative above that is NOT "
+            "itself a forced mate THROWS THE MATE AWAY: its alt-note must say it gives up / "
+            "lets the forced mate slip (中文 \"放走了强制将杀\"), never frame it as merely a "
+            "slower win or as 'still winning' / '保持胜势' without that caveat.",
+        ]
 
     # BRANCH FACTS: when THIS move delivers mate and the hero's PREVIOUS move was a
     # forced mate-in-two, list every defense + its mate so the prose can honestly say

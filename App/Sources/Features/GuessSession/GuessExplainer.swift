@@ -55,7 +55,14 @@ enum GuessExplainer {
                     beatMaster: false))
         }
 
-        if let prose = point.altAnnotations[guessUci] {
+        // Mate-relevant misses use the deterministic mate-aware template even when prose
+        // exists. The template states the squandered/allowed forced mate plainly and stays
+        // spoiler-safe (it never names the still-unguessed mating line), whereas hand prose
+        // can gloss a thrown-away mate as merely "still winning" (Jerry 2026-06-17: Qb7 at
+        // Opera m16 read as "keeps a winning position" while it gave up mate in two).
+        let squandersMate = evaluation.evalDeltaCp >= mateThresholdCp
+        let allowsMate = (guessEvalCp ?? 0) <= -mateThresholdCp
+        if !squandersMate, !allowsMate, let prose = point.altAnnotations[guessUci] {
             return Explanation(guessSan: guessSan, text: prose)
         }
         return Explanation(
@@ -63,6 +70,7 @@ enum GuessExplainer {
             text: shortfallTemplate(
                 guessSan: guessSan,
                 guessEvalCp: guessEvalCp,
+                masterEvalCp: point.candidateEvals[point.uci],
                 evalDeltaCp: evaluation.evalDeltaCp,
                 refutationSan: detail?.refutationSan ?? [],
                 onlyMoveHeld: onlyBestMoveHeld(point)
@@ -107,6 +115,7 @@ enum GuessExplainer {
     static func shortfallTemplate(
         guessSan: String,
         guessEvalCp: Int?,
+        masterEvalCp: Int? = nil,
         evalDeltaCp: Int,
         refutationSan: [String],
         onlyMoveHeld: Bool = false
@@ -120,8 +129,22 @@ enum GuessExplainer {
                 ? "After \(guessSan), the engine finds a forced mate against you."
                 : "After \(guessSan), \(line) leads to a forced mate against you."
         }
+        // Squandered a forced mate. The finishing line is the next move the trainee still
+        // has to guess, so we never show it. The bare "doesn't force mate" confused the
+        // user ("I thought my move could mate too") — so TEACH the distinction: a winning
+        // move still lets the opponent wriggle out of the mate, a forced mate leaves no way
+        // out (Jerry 2026-06-17). "winning" vs "forced mate" is the lesson for 800-2000.
         if evalDeltaCp >= mateThresholdCp {
-            return "\(guessSan) lets a forced mate slip away \u{2014} the winning idea is still on the board."
+            let stillWinning = (guessEvalCp ?? 0) >= 200   // clearly better — the validator's "winning" bar
+            let lead = stillWinning
+                ? "\(guessSan) is still winning, but it doesn't force mate \u{2014} the defender still has a way out of the checkmate."
+                : "\(guessSan) doesn't force mate \u{2014} the defender still has a way out of the checkmate."
+            // Only credit the master's move with the mate when it IS the mating move; else
+            // some other candidate was (never overclaim — chess correctness is sacred).
+            let tail = (masterEvalCp ?? 0) >= mateThresholdCp
+                ? " The master's move leaves none."
+                : " A forced mate was on the board here."
+            return lead + tail
         }
 
         // Frame a fair 0: when only the top move held, say so (grounded fact) before the
