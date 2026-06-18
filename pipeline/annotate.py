@@ -60,6 +60,14 @@ HARD RULES (a validator rejects violations):
 - Only name a move in algebraic notation if it is a legal move for the side to move in
   THIS position (i.e. it appears in the candidate list). Describe the OPPONENT's replies
   in words, never in notation.
+- Never write a bare board square or coordinate in prose — the validator reads any
+  letter+number like "g5"/"d8" as a move and REJECTS the whole annotation. This is the
+  single most common failure, so be strict:
+    * a pawn/piece named by its square -> drop the square. Write "the pawn" or "the
+      queenside pawn", NEVER "the b5 pawn"; "the bishop", NEVER "the bishop on g5".
+    * a destination -> describe by role. Write "drops onto the back rank", NEVER "lands on d8".
+  Describe squares only by ROLE ("the back rank", "the long diagonal", "the escape squares").
+  A letter+number may appear ONLY inside a listed candidate MOVE's notation (e.g. Bg5+, Rd8#).
 - Do NOT claim a move "wins", "loses", "drops", or "hangs" material unless the supplied
   facts list a capture in that move's line. Material words must be backed by a listed capture.
 - Do NOT generalize about a CATEGORY of moves ("the other queen moves", "the quieter rook
@@ -94,6 +102,13 @@ SYSTEM_PROMPT_ZH = """\
   禁用"最佳""必胜""碾压"等说法。
 - 只有出现在候选着法列表中的着法才能用记谱法点名;着法记谱保留英文代数记谱法
   (如 Bg5+、O-O-O),不要翻译成中文记谱。对手的应着用文字描述,不用记谱。
+- 散文中绝不能出现单独的格子坐标——校验器会把任何"字母+数字"(如 g5、d8)当成着法
+  而拒绝整条讲解。这是最常见的失败,务必严格:
+    * 用格子称呼棋子/兵时,去掉格子:写"那个兵""后翼兵",绝不写"b5 兵";写"象",
+      绝不写"g5 的象"。
+    * 表示落点时,用作用描述:写"杀入底线",绝不写"落在 d8"。
+  只能用作用描述格子(如"底线""大斜线""逃格")。"字母+数字"只允许作为候选着法
+  列表里某一着的英文代数记谱出现(如 Bg5+、Rd8#)。
 - 除非该着法的变着数据中列有吃子,否则不得声称"得子""丢子""丢兵"等子力变化。
 - 不得对一整类着法笼统下结论(如"其余后的着法""慢一些的车着""那些缓手都保有优势"):
   你只看到排名靠前的候选着法,并非全部合法着法,因此"某一类着法都保有/丢失优势"
