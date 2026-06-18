@@ -75,6 +75,44 @@ MATE_CREDIT_RE_ZH = re.compile(r"(兵|马|象|车|后)(?:完成|实施|发动)?�
 
 ZH_PIECE_KIND = {"兵": "pawn", "马": "knight", "象": "bishop", "车": "rook", "后": "queen"}
 
+# Mate-DISTANCE wording ("mate in three", "forced mate next move", "下一步...将杀") must
+# equal the engine's forced-mate count. Jerry 2026-06-17: Réti move-10 (engine #2) was
+# narrated as "forced mate next move" (=#1), colliding with the real move-11 mate and
+# reading as off-by-one against move-9's "mate in three". The count is an engine fact.
+MATE_DISTANCE_RE = re.compile(
+    r"\bmates?\s+(?:in\s+([a-z]+|\d+)|(next\s+move))\b", re.I
+)
+MATE_DISTANCE_RE_ZH = re.compile(
+    r"(下一步|[一二两三四五六七八九十]+步)(?:内|即)?[^。,，！!?？]{0,6}?将杀"
+)
+EN_NUMBER_WORDS = {
+    "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+    "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+}
+ZH_NUMBER_WORDS = {
+    "一": 1, "二": 2, "两": 2, "三": 3, "四": 4, "五": 5,
+    "六": 6, "七": 7, "八": 8, "九": 9, "十": 10,
+}
+
+# Blanket claims about a CLASS of moves ("the quieter queen moves keep a big advantage")
+# must hold across that piece's moves in legal_evals. Jerry 2026-06-17: Opera m16 said
+# exactly this while 12 of 15 queen moves were blunders — the LLM generalized from the
+# two good retreats it was shown to the whole class. We have every legal move at build,
+# so the claim is checkable. EN only (the zh mirror is caught by prompt + human review).
+CLASS_CLAIM_RE = re.compile(
+    r"\b(?:other|quiet|quieter|slow|slower|slowest|remaining|alternative|those|rest of the)\s+"
+    r"(queen|rook|bishop|knight|pawn|king)\s+moves\b", re.I
+)
+KEEPS_ADVANTAGE_RE = re.compile(
+    r"\b(?:keep|keeps|hold|holds|retain|retains|stay|stays|remain|remains|still)\b[^.!?]*?"
+    r"\b(?:advantage|winning|better|edge|initiative|pressure|upper hand|on top|a plus)\b", re.I
+)
+PIECE_WORD_TO_TYPE = {
+    "pawn": chess.PAWN, "knight": chess.KNIGHT, "bishop": chess.BISHOP,
+    "rook": chess.ROOK, "queen": chess.QUEEN, "king": chess.KING,
+}
+MIN_CLASS_MOVES = 3   # need enough of that piece's moves for a class claim to be meaningful
+
 
 @dataclass
 class ValidationError:
@@ -179,6 +217,94 @@ def check_mate_claims(text: str, pattern: facts.MatePattern,
     return errors
 
 
+def _parse_distance_en(token: str) -> int | None:
+    token = token.strip().lower()
+    if token.isdigit():
+        return int(token)
+    return EN_NUMBER_WORDS.get(token)
+
+
+def _parse_distance_zh(token: str) -> int | None:
+    token = token.strip()
+    if token == "下一步":
+        return 1
+    return ZH_NUMBER_WORDS.get(token.replace("步", ""))
+
+
+def check_mate_distance(text: str, mate_n: int | None,
+                        game_id: str, ply: int, where: str) -> list[ValidationError]:
+    """Mate-distance wording ('mate in three' / '下一步...将杀') must equal the engine's
+    forced-mate count. Only fires when the master move IS a forced mate for the mover;
+    "next move" / "下一步" mean mate-in-one only (the Réti move-10 off-by-one)."""
+    errors: list[ValidationError] = []
+    if not text or mate_n is None or mate_n <= 0:
+        return errors
+    stated: list[tuple[str, int]] = []
+    for m in MATE_DISTANCE_RE.finditer(text):
+        d = 1 if m.group(2) else _parse_distance_en(m.group(1))
+        if d is not None:
+            stated.append((m.group(0), d))
+    for m in MATE_DISTANCE_RE_ZH.finditer(text):
+        d = _parse_distance_zh(m.group(1))
+        if d is not None:
+            stated.append((m.group(0), d))
+    for quote, d in stated:
+        if d != mate_n:
+            errors.append(ValidationError(
+                game_id, ply, "mate_distance_mismatch",
+                f"{where}: prose says '{quote.strip()}' (mate in {d}) but the engine "
+                f"reads a forced mate in {mate_n}"))
+    return errors
+
+
+def _piece_moves_keeping(move: MoveRecord, piece_type: int) -> tuple[int, int]:
+    """(keeping, total) over `move`'s legal_evals for moves BY the given piece type,
+    excluding the master move. 'Keeping' = the mover stays at least equal (cp >= 0) or
+    has a winning mate. Piece type is read from the board, never guessed."""
+    board = chess.Board(move.fen_before)
+    keeping = total = 0
+    for uci, entry in move.legal_evals.items():
+        if uci == move.uci or len(uci) < 4:
+            continue
+        try:
+            piece = board.piece_at(chess.parse_square(uci[:2]))
+        except ValueError:
+            continue
+        if piece is None or piece.piece_type != piece_type:
+            continue
+        total += 1
+        cp = entry.get("cp")
+        mate = entry.get("mate")
+        if (mate is not None and mate > 0) or (cp is not None and cp >= 0):
+            keeping += 1
+    return keeping, total
+
+
+def check_class_generalization(text: str, move: MoveRecord,
+                               game_id: str, ply: int, where: str) -> list[ValidationError]:
+    """Flag a blanket 'the <quieter> <piece> moves keep the advantage' claim when, per
+    legal_evals, the MAJORITY of that piece's non-master moves do NOT keep it (the Opera
+    m16 'quieter queen moves keep a big advantage' overgeneralization). Conservative:
+    needs an explicit keep-advantage verb in the same sentence and >= MIN_CLASS_MOVES of
+    that piece, and only fires when most actually throw the advantage away."""
+    errors: list[ValidationError] = []
+    if not text or not move.legal_evals:
+        return errors
+    for sentence in re.split(r"[.!?]+", text):
+        if not KEEPS_ADVANTAGE_RE.search(sentence):
+            continue
+        for m in CLASS_CLAIM_RE.finditer(sentence):
+            piece_type = PIECE_WORD_TO_TYPE[m.group(1).lower()]
+            keeping, total = _piece_moves_keeping(move, piece_type)
+            if total >= MIN_CLASS_MOVES and keeping * 2 < total:
+                errors.append(ValidationError(
+                    game_id, ply, "overgeneralized_class_claim",
+                    f"{where}: claims '{m.group(0)}' keep the advantage, but only "
+                    f"{keeping}/{total} {m.group(1).lower()} moves stay at least equal "
+                    f"(the rest throw it away)"))
+    return errors
+
+
 def _normalize_san(san: str) -> str:
     return san.rstrip("+#")
 
@@ -258,6 +384,14 @@ def _validate_main_prose(game_id: str, move: MoveRecord, text: str, where: str,
     # 4) mate piece-credit claims, checked against the computed mate pattern (§5.1).
     pattern = facts.mate_pattern(move.fen_before, move.uci)
     errors.extend(check_mate_claims(text, pattern, game_id, move.ply))
+
+    # 4d) mate-DISTANCE wording must match the engine's forced-mate count (§5.1).
+    master_mate = (move.legal_evals.get(move.uci) or {}).get("mate")
+    errors.extend(check_mate_distance(text, master_mate, game_id, move.ply, where))
+
+    # 4e) blanket "the <quieter> <piece> moves keep the advantage" claims must hold across
+    # that piece's moves in legal_evals (Opera m16 overgeneralization, §5.1).
+    errors.extend(check_class_generalization(text, move, game_id, move.ply, where))
 
     # 4b) spoiler guard: must not name a master move the trainee still has to guess.
     errors.extend(check_future_guess_spoilers(

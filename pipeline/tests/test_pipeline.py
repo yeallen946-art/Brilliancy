@@ -142,6 +142,139 @@ def test_validate_flags_false_winning_claim():
     assert "eval_adjective_mismatch" in codes
 
 
+# Regression: Réti move-10 (engine #2) shipped as "forced mate next move" (=#1),
+# off-by-one against move-9's "mate in three" (Jerry 2026-06-17).
+RETI_M10_FEN = "rnbk1b1r/pp3ppp/2p5/4q3/4n3/8/PPPB1PPP/2KR1BNR w - - 0 10"
+
+
+def _mate_move(annotation, mate_n, annotation_zh=None):
+    return MoveRecord(
+        ply=19, san="Bg5+", uci="d2g5", fen_before=RETI_M10_FEN, mover="white",
+        is_guess_point=True, annotation=annotation, annotation_zh=annotation_zh,
+        legal_evals={"d2g5": {"cp": None, "mate": mate_n, "refutation_pv": ["d8c7"]}},
+    )
+
+
+def test_validate_flags_wrong_mate_distance():
+    from validate import validate_move
+    move = _mate_move("Bg5+ is the point: the engine shows forced mate next move.", 2)
+    codes = {e.code for e in validate_move("g", move)}
+    assert "mate_distance_mismatch" in codes
+
+
+def test_validate_flags_wrong_mate_distance_zh():
+    from validate import validate_move
+    move = _mate_move("Bg5+", 2, annotation_zh="Bg5+ 是弃后的全部意义:引擎显示下一步即强制将杀。")
+    codes = {e.code for e in validate_move("g", move)}
+    assert "mate_distance_mismatch" in codes
+
+
+def test_validate_accepts_correct_mate_distance():
+    from validate import validate_move
+    move = _mate_move(
+        "Bg5+ is the point of the sacrifice: the engine shows forced mate in two.", 2,
+        annotation_zh="Bg5+ 是弃后的全部意义:引擎显示两步内强制将杀。",
+    )
+    codes = {e.code for e in validate_move("g", move)}
+    assert "mate_distance_mismatch" not in codes
+
+
+def test_move_prompt_states_exact_mate_distance():
+    from annotate import build_move_prompt
+    move = _mate_move("x", 2)
+    game = _approved_game()
+    game.moves = [move]
+    prompt = build_move_prompt(game, move)
+    assert "FORCED MATE IN 2" in prompt
+    # Alternatives that aren't themselves mates must be framed as throwing the mate away
+    # (Jerry 2026-06-17: Opera m16 Qb7 read as "keeps a winning position").
+    assert "THROWS THE MATE AWAY" in prompt
+
+
+# Opera move-16 (Qb8+): "the quieter queen moves keep a big advantage" while 12 of 15
+# queen moves were blunders (Jerry 2026-06-17).
+OPERA_M16_FEN = "4kb1r/p2n1ppp/4q3/4p1B1/4P3/1Q6/PPP2PPP/2KR4 w k - 0 16"
+
+
+def _queen_class_move(annotation, queen_evals):
+    legal = {"b3b8": {"cp": None, "mate": 2}}   # master Qb8+ (forced mate)
+    legal.update(queen_evals)
+    return MoveRecord(
+        ply=31, san="Qb8+", uci="b3b8", fen_before=OPERA_M16_FEN, mover="white",
+        is_guess_point=True, annotation=annotation, legal_evals=legal,
+    )
+
+
+def test_validate_flags_overgeneralized_class_claim():
+    from validate import validate_move
+    # Only b3b7/b3c3/b3b5 stay >= 0; the rest throw the advantage away.
+    move = _queen_class_move(
+        "The master's move is the point. The quieter queen moves keep a big advantage.",
+        {"b3b7": {"cp": 314}, "b3c3": {"cp": 306}, "b3b5": {"cp": 27},
+         "b3a4": {"cp": -23}, "b3e6": {"cp": -116}, "b3d3": {"cp": -125}, "b3f3": {"cp": -223}},
+    )
+    codes = {e.code for e in validate_move("g", move)}
+    assert "overgeneralized_class_claim" in codes
+
+
+def test_validate_accepts_class_claim_when_true():
+    from validate import validate_move
+    # Here most queen moves really do keep a big advantage -> no false positive.
+    move = _queen_class_move(
+        "The other queen moves keep a big advantage but lose the forced finish.",
+        {"b3b7": {"cp": 314}, "b3c3": {"cp": 306}, "b3d3": {"cp": 150},
+         "b3e6": {"cp": 120}, "b3a4": {"cp": -50}},
+    )
+    codes = {e.code for e in validate_move("g", move)}
+    assert "overgeneralized_class_claim" not in codes
+
+
+def test_system_prompt_forbids_class_generalization():
+    from annotate import system_prompt
+    assert "generalize about a CATEGORY" in system_prompt("en")
+    assert "笼统下结论" in system_prompt("zh")
+
+
+def test_openrouter_request_body_is_strict_json_schema():
+    from annotate import MoveAnnotationResult, openrouter_request_body
+    body = openrouter_request_body("anthropic/claude-opus-4-8", "SYS", "USER",
+                                   MoveAnnotationResult, max_tokens=1024)
+    assert body["model"] == "anthropic/claude-opus-4-8"
+    assert body["messages"][0] == {"role": "system", "content": "SYS"}
+    assert body["messages"][1] == {"role": "user", "content": "USER"}
+    fmt = body["response_format"]
+    assert fmt["type"] == "json_schema"
+    assert fmt["json_schema"]["strict"] is True
+    # strict schema: objects closed to extra keys (mirrors the Anthropic path).
+    assert fmt["json_schema"]["schema"]["additionalProperties"] is False
+
+
+def test_load_dotenv_parses_and_does_not_override_env(tmp_path, monkeypatch):
+    from annotate import load_dotenv
+    env = tmp_path / ".env"
+    env.write_text(
+        "# comment\n"
+        "OPENROUTER_API_KEY=sk-or-test\n"
+        'export OPENROUTER_MODEL="anthropic/claude-opus-4-8"\n'
+        "\n"
+        "ALREADY_SET=from_file\n",
+        encoding="utf-8",
+    )
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.delenv("OPENROUTER_MODEL", raising=False)
+    monkeypatch.setenv("ALREADY_SET", "from_env")   # real env must win
+    parsed = load_dotenv(str(env))
+    assert parsed["OPENROUTER_API_KEY"] == "sk-or-test"
+    assert parsed["OPENROUTER_MODEL"] == "anthropic/claude-opus-4-8"   # quotes stripped
+    assert os.environ["OPENROUTER_API_KEY"] == "sk-or-test"
+    assert os.environ["ALREADY_SET"] == "from_env"                    # not overridden
+
+
+def test_load_dotenv_missing_file_is_empty():
+    from annotate import load_dotenv
+    assert load_dotenv("/no/such/.env") == {}
+
+
 def test_line_has_capture():
     from validate import line_has_capture
     # e4 e5 Nf3 — no capture
