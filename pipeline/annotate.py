@@ -200,6 +200,11 @@ def load_dotenv(path: str) -> dict[str, str]:
     return parsed
 
 
+# Low temperature: annotations are grounded fact-narration, not creative writing — keep the
+# model tight to the rules (sentence-length / no-material-without-capture slips drop sharply).
+OPENROUTER_TEMPERATURE = 0.2
+
+
 def openrouter_request_body(model: str, system: str, user_content: str,
                             schema_model: type[BaseModel], max_tokens: int) -> dict:
     """OpenAI-compatible chat-completions body with strict json_schema structured output —
@@ -207,6 +212,7 @@ def openrouter_request_body(model: str, system: str, user_content: str,
     return {
         "model": model,
         "max_tokens": max_tokens,
+        "temperature": OPENROUTER_TEMPERATURE,
         "messages": [
             {"role": "system", "content": system},
             {"role": "user", "content": user_content},
@@ -327,15 +333,22 @@ def build_move_prompt(game: GameRecord, move: MoveRecord, lang: str = "en") -> s
     # against move-9's "mate in three"). Surface the exact distance so the wording is honest.
     master_mate = (move.legal_evals.get(move.uci) or {}).get("mate")
     if isinstance(master_mate, int) and master_mate > 0:
+        if facts.mate_pattern(move.fen_before, move.uci).is_mate:
+            mate_line = (f"MATE: {master_san} DELIVERS CHECKMATE — the game ends on this move. "
+                         f"Call it checkmate / mate (中文 \"将杀\"); NEVER \"mate in 1\" or any "
+                         f"distance — there is no move after it.")
+        else:
+            mate_line = (f"MATE DISTANCE: the engine reads {master_san} as a FORCED MATE IN "
+                         f"{master_mate} (it does NOT itself checkmate). If you state the distance, "
+                         f"it must be exactly \"mate in {master_mate}\" (中文 \"{master_mate}步内将杀\"); "
+                         f"\"next move\" / \"下一步\" means mate in one ONLY.")
         lines += [
             "",
-            f"MATE DISTANCE: the engine reads {master_san} as a FORCED MATE IN {master_mate}. "
-            f"If you state the distance, it must be exactly \"mate in {master_mate}\" "
-            f"(中文 \"{master_mate}步内将杀\"); \"next move\" / \"下一步\" means mate in one ONLY.",
-            f"Because {master_san} is a FORCED MATE, every alternative above that is NOT "
-            "itself a forced mate THROWS THE MATE AWAY: its alt-note must say it gives up / "
-            "lets the forced mate slip (中文 \"放走了强制将杀\"), never frame it as merely a "
-            "slower win or as 'still winning' / '保持胜势' without that caveat.",
+            mate_line,
+            f"Because {master_san} forces mate, every alternative above that is NOT itself a "
+            "forced mate THROWS THE MATE AWAY: its alt-note must say it gives up / lets the "
+            "forced mate slip (中文 \"放走了强制将杀\"), never frame it as merely a slower win "
+            "or as 'still winning' / '保持胜势' without that caveat.",
         ]
 
     # BRANCH FACTS: when THIS move delivers mate and the hero's PREVIOUS move was a

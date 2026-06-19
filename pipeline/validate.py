@@ -231,11 +231,15 @@ def _parse_distance_zh(token: str) -> int | None:
     return ZH_NUMBER_WORDS.get(token.replace("步", ""))
 
 
-def check_mate_distance(text: str, mate_n: int | None,
+def check_mate_distance(text: str, mate_n: int | None, delivers_mate: bool,
                         game_id: str, ply: int, where: str) -> list[ValidationError]:
     """Mate-distance wording ('mate in three' / '下一步...将杀') must equal the engine's
     forced-mate count. Only fires when the master move IS a forced mate for the mover;
-    "next move" / "下一步" mean mate-in-one only (the Réti move-10 off-by-one)."""
+    "next move" / "下一步" mean mate-in-one only (the Réti move-10 off-by-one).
+
+    If the move ITSELF delivers checkmate (`delivers_mate`), ANY distance phrase is wrong —
+    the move is mate now, so the prose must say "checkmate", not "mate in 1" (Jerry
+    2026-06-18: Opera Rd8# said "mate in 1" although it is the mating move)."""
     errors: list[ValidationError] = []
     if not text or mate_n is None or mate_n <= 0:
         return errors
@@ -249,7 +253,12 @@ def check_mate_distance(text: str, mate_n: int | None,
         if d is not None:
             stated.append((m.group(0), d))
     for quote, d in stated:
-        if d != mate_n:
+        if delivers_mate:
+            errors.append(ValidationError(
+                game_id, ply, "mate_distance_mismatch",
+                f"{where}: prose says '{quote.strip()}' but this move DELIVERS checkmate — "
+                f"say 'checkmate', not a distance"))
+        elif d != mate_n:
             errors.append(ValidationError(
                 game_id, ply, "mate_distance_mismatch",
                 f"{where}: prose says '{quote.strip()}' (mate in {d}) but the engine "
@@ -385,9 +394,11 @@ def _validate_main_prose(game_id: str, move: MoveRecord, text: str, where: str,
     pattern = facts.mate_pattern(move.fen_before, move.uci)
     errors.extend(check_mate_claims(text, pattern, game_id, move.ply))
 
-    # 4d) mate-DISTANCE wording must match the engine's forced-mate count (§5.1).
+    # 4d) mate-DISTANCE wording must match the engine's forced-mate count (§5.1); a move
+    # that itself checkmates must say "checkmate", not "mate in 1".
     master_mate = (move.legal_evals.get(move.uci) or {}).get("mate")
-    errors.extend(check_mate_distance(text, master_mate, game_id, move.ply, where))
+    delivers_mate = facts.mate_pattern(move.fen_before, move.uci).is_mate
+    errors.extend(check_mate_distance(text, master_mate, delivers_mate, game_id, move.ply, where))
 
     # 4e) blanket "the <quieter> <piece> moves keep the advantage" claims must hold across
     # that piece's moves in legal_evals (Opera m16 overgeneralization, §5.1).

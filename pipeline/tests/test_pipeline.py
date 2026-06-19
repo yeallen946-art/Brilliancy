@@ -179,6 +179,43 @@ def test_validate_accepts_correct_mate_distance():
     assert "mate_distance_mismatch" not in codes
 
 
+# A move that ITSELF delivers checkmate must say "checkmate", not "mate in 1"
+# (Jerry 2026-06-18: Opera Rd8# = move 17 read as "mate in 1").
+OPERA_MATE_FEN = "1n2kb1r/p4ppp/4q3/4p1B1/4P3/8/PPP2PPP/2KR4 w k - 0 17"
+
+
+def _mating_move(annotation):
+    return MoveRecord(
+        ply=33, san="Rd8#", uci="d1d8", fen_before=OPERA_MATE_FEN, mover="white",
+        is_guess_point=True, annotation=annotation,
+        legal_evals={"d1d8": {"cp": None, "mate": 1}},
+    )
+
+
+def test_validate_flags_mate_in_one_on_mating_move():
+    from validate import validate_move
+    move = _mating_move("The rook crashes onto the back rank — it's mate in 1.")
+    codes = {e.code for e in validate_move("g", move)}
+    assert "mate_distance_mismatch" in codes
+
+
+def test_validate_accepts_checkmate_wording_on_mating_move():
+    from validate import validate_move
+    move = _mating_move("The rook delivers checkmate on the back rank; the king is trapped.")
+    codes = {e.code for e in validate_move("g", move)}
+    assert "mate_distance_mismatch" not in codes
+
+
+def test_move_prompt_says_checkmate_not_distance_on_mating_move():
+    from annotate import build_move_prompt
+    move = _mating_move("x")
+    game = _approved_game()
+    game.moves = [move]
+    prompt = build_move_prompt(game, move)
+    assert "DELIVERS CHECKMATE" in prompt
+    assert "FORCED MATE IN" not in prompt   # no distance framing for the mating move
+
+
 def test_move_prompt_states_exact_mate_distance():
     from annotate import build_move_prompt
     move = _mate_move("x", 2)
@@ -242,6 +279,7 @@ def test_openrouter_request_body_is_strict_json_schema():
     assert body["model"] == "anthropic/claude-opus-4-8"
     assert body["messages"][0] == {"role": "system", "content": "SYS"}
     assert body["messages"][1] == {"role": "user", "content": "USER"}
+    assert body["temperature"] <= 0.3   # grounded narration, kept tight to the rules
     fmt = body["response_format"]
     assert fmt["type"] == "json_schema"
     assert fmt["json_schema"]["strict"] is True
