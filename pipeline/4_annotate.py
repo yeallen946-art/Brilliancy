@@ -29,14 +29,18 @@ from annotate import (
     MODEL,
     OPENROUTER_URL,
     GameIntroResult,
+    JudgeResult,
     MoveAnnotationResult,
     apply_move_annotation,
     build_intro_prompt,
+    build_judge_prompt,
     build_move_prompt,
+    generate_rationale_with_repair,
     load_dotenv,
     openrouter_request_body,
     strict_json_schema,
     system_prompt,
+    upcoming_guess_sans,
 )
 
 ENV_PATH = os.path.join(os.path.dirname(__file__), ".env")
@@ -152,8 +156,9 @@ def _openrouter_chat(model: str, system: str, user_content: str, schema_model,
     return schema_model.model_validate_json(content)
 
 
-def run_openrouter(game, lang: str, model: str, api_key: str) -> None:
-    """OpenRouter path — synchronous, same prompts/schemas as the Anthropic path."""
+def run_openrouter(game, lang: str, model: str, api_key: str,
+                   judge_model: str | None = None) -> None:
+    """OpenRouter path — synchronous, with the v2 repair loop + optional LLM-judge gate."""
     intro = _openrouter_chat(model, system_prompt(lang), build_intro_prompt(game, lang),
                              GameIntroResult, api_key=api_key, max_tokens=512)
     if lang == "zh":
@@ -162,10 +167,41 @@ def run_openrouter(game, lang: str, model: str, api_key: str) -> None:
         game.narrative_intro = intro.narrative_intro
 
     for move in _guess_points_with_evals(game):
-        res = _openrouter_chat(model, system_prompt(lang), build_move_prompt(game, move, lang),
-                               MoveAnnotationResult, api_key=api_key, max_tokens=1024)
-        apply_move_annotation(move, res, lang)
-        print(f"  annotated ply {move.ply} ({move.san}) [{lang}] via openrouter:{model}")
+        base = build_move_prompt(game, move, lang)
+
+        def generate(errors, base=base):
+            prompt = base
+            if errors:
+                prompt += ("\n\nYOUR PREVIOUS RATIONALE FAILED THESE CHECKS:\n- "
+                           + "\n- ".join(errors)
+                           + "\nRewrite the `rationale` ONLY to fix them. Keep it short, "
+                             "plan-language, and state no facts.")
+            return _openrouter_chat(model, system_prompt(lang), prompt,
+                                    MoveAnnotationResult, api_key=api_key, max_tokens=1024).rationale
+
+        judge = None
+        if judge_model:
+            def judge(composed, move=move, lang=lang):
+                res = _openrouter_chat(
+                    judge_model, "You are a strict, precise chess reviewer.",
+                    build_judge_prompt(move, composed, lang),
+                    JudgeResult, api_key=api_key, max_tokens=512)
+                return list(res.issues) if res.verdict.strip().lower() == "revise" else []
+
+        composed, residual = generate_rationale_with_repair(
+            game.id, move, lang, upcoming_guess_sans(game, move),
+            generate=generate, judge=judge)
+        if lang == "zh":
+            move.annotation_zh, move.alt_annotations_zh = composed, {}
+        else:
+            move.annotation, move.alt_annotations = composed, {}
+        if residual:
+            move.needs_human = True
+            move.review_notes = sorted(set(move.review_notes + residual))
+            print(f"  ! ply {move.ply} ({move.san}) [{lang}] NEEDS_HUMAN after repairs: "
+                  f"{'; '.join(residual)}", file=sys.stderr)
+        else:
+            print(f"  annotated ply {move.ply} ({move.san}) [{lang}] via openrouter:{model}")
 
 
 def main() -> int:
@@ -187,6 +223,8 @@ def main() -> int:
                                         "e.g. anthropic/claude-opus-4-8; or set OPENROUTER_MODEL)")
     parser.add_argument("--lang", choices=["en", "zh"], default="en",
                         help="narration language (PRD 12.1: zh narrates the same facts)")
+    parser.add_argument("--no-judge", action="store_true",
+                        help="skip the LLM-judge grounding gate (OpenRouter only)")
     args = parser.parse_args()
 
     game = store.load_game(args.game_id, args.work_dir)
@@ -202,11 +240,18 @@ def main() -> int:
                   "environment.", file=sys.stderr)
             return 1
         model = args.model or os.environ.get("OPENROUTER_MODEL") or f"anthropic/{MODEL}"
+        # Judge model (v2 §3.3, decision C: ideally a DIFFERENT model for uncorrelated blind
+        # spots). Defaults to the generation model for out-of-the-box use; set
+        # OPENROUTER_JUDGE_MODEL in .env to a distinct model.
+        judge_model = None if args.no_judge else (os.environ.get("OPENROUTER_JUDGE_MODEL") or model)
         if args.no_batch:
             print("note: --no-batch is implied for OpenRouter (no batch endpoint).", file=sys.stderr)
+        if judge_model and judge_model == model:
+            print("note: judge uses the SAME model as generation — set OPENROUTER_JUDGE_MODEL "
+                  "to a different one for stronger checking (v2 decision C).", file=sys.stderr)
         print(f"Annotating {game.id}: {len(points)} guess point(s) + intro "
-              f"(lang={args.lang}, openrouter:{model}).")
-        run_openrouter(game, args.lang, model, api_key)
+              f"(lang={args.lang}, openrouter:{model}, judge:{judge_model or 'off'}).")
+        run_openrouter(game, args.lang, model, api_key, judge_model=judge_model)
     else:
         if not os.environ.get("ANTHROPIC_API_KEY"):
             print("ANTHROPIC_API_KEY not set — stage 4 needs it (or use --provider openrouter).",

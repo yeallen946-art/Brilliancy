@@ -46,6 +46,10 @@ class MoveRecord:
     # never a translation of the English. None/empty until a zh annotate run.
     annotation_zh: str | None = None
     alt_annotations_zh: dict = field(default_factory=dict)
+    # v2 repair loop (ANNOTATION_PIPELINE_V2 §3.4): set when a rationale could not be made
+    # validator-clean within the repair cap, so 6_review surfaces only these few moves.
+    needs_human: bool = False
+    review_notes: list[str] = field(default_factory=list)
 
 
 @dataclass

@@ -296,3 +296,75 @@ def move_character(fen_before: str, uci: str) -> list[str]:
         elif board.is_check():
             tags.append("check")
     return tags
+
+
+# ---- FactSheet: the deterministic fact layer (ANNOTATION_PIPELINE_V2 §3.1) ----------
+# Everything verifiable about a move, composed into one structured object plus a fixed
+# `fact_line` (EN/ZH) that the LLM never writes. This removes the fact-layer bug classes
+# (wrong mate distance, mate-vs-checkmate, unbacked material) by construction: the line is
+# the same engine fact 5_validate checks, so it cannot disagree with the engine.
+
+# Eval buckets in centipawns, from the better side's POV. Kept here (the pipeline's source
+# of truth for verdict wording); mirrors the spirit of the app's ScoringConfig buckets.
+_VERDICT_BANDS = [            # (min_abs_cp, en, zh)
+    (600, "winning", "胜势"),
+    (300, "much better", "大幅领先"),
+    (150, "clearly better", "明显占优"),
+    (50,  "slightly better", "略占上风"),
+]
+
+def _eval_verdict(cp: int, mover_is_white: bool) -> tuple[str, str]:
+    """Verdict clause from the mover-POV centipawn score (EN, ZH)."""
+    if abs(cp) <= 50:
+        return ("The position is roughly level.", "局面大致均势。")
+    better_white = (cp > 0) == mover_is_white
+    side_en = "White" if better_white else "Black"
+    side_zh = "白方" if better_white else "黑方"
+    deg_en = deg_zh = ""
+    for floor, en, zh in _VERDICT_BANDS:
+        if abs(cp) >= floor:
+            deg_en, deg_zh = en, zh
+            break
+    pawns = abs(cp) / 100.0
+    return (f"{side_en} is {deg_en} (+{pawns:.1f}).", f"{side_zh}{deg_zh}(+{pawns:.1f})。")
+
+
+@dataclass
+class FactSheet:
+    is_checkmate: bool
+    mate_in: int | None          # forced-mate distance for the mover; None if not a mate
+    eval_cp: int | None          # mover POV
+    mover_is_white: bool
+    fact_line_en: str
+    fact_line_zh: str
+
+
+def build_fact_sheet(fen_before: str, uci: str, *, eval_cp: int | None,
+                     eval_mate: int | None) -> FactSheet:
+    """Compose the deterministic fact layer for one move. The fact_line is fixed text the
+    LLM is forbidden to restate; the rationale (LLM) is appended to it downstream.
+
+    Material is intentionally NOT in the line yet: net material from the 3-ply
+    refutation_pv is truncated mid-exchange and would mislabel sacrifices/recaptures. The
+    eval verdict already carries the advantage; a SEE-based material clause is future work."""
+    board = chess.Board(fen_before)
+    mover_is_white = board.turn == chess.WHITE
+    is_mate = mate_pattern(fen_before, uci).is_mate
+
+    if is_mate:
+        en, zh = "Checkmate.", "将杀。"
+    elif eval_mate is not None and eval_mate > 0:
+        en, zh = f"Forced mate in {eval_mate}.", f"{eval_mate} 步强制将杀。"
+    elif eval_cp is not None:
+        en, zh = _eval_verdict(eval_cp, mover_is_white)
+    else:
+        en, zh = "", ""
+
+    return FactSheet(
+        is_checkmate=is_mate,
+        mate_in=None if is_mate else (eval_mate if (eval_mate or 0) > 0 else None),
+        eval_cp=eval_cp,
+        mover_is_white=mover_is_white,
+        fact_line_en=en,
+        fact_line_zh=zh,
+    )

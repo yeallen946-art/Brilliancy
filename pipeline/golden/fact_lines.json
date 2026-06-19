@@ -1,0 +1,32 @@
+[
+  {
+    "name": "opera-rd8-checkmate",
+    "fen": "1n2kb1r/p4ppp/4q3/4p1B1/4P3/8/PPP2PPP/2KR4 w k - 0 17",
+    "uci": "d1d8", "eval_cp": null, "eval_mate": 1,
+    "fact_line_en": "Checkmate.", "fact_line_zh": "将杀。"
+  },
+  {
+    "name": "opera-qb8-forced-mate-2",
+    "fen": "4kb1r/p2n1ppp/4q3/4p1B1/4P3/1Q6/PPP2PPP/2KR4 w k - 0 16",
+    "uci": "b3b8", "eval_cp": null, "eval_mate": 2,
+    "fact_line_en": "Forced mate in 2.", "fact_line_zh": "2 步强制将杀。"
+  },
+  {
+    "name": "reti-qd8-forced-mate-3",
+    "fen": "rnbk1b1r/pp3ppp/2p5/4q3/4n3/8/PPPB1PPP/2KR1BNR w - - 0 10",
+    "uci": "d2g5", "eval_cp": null, "eval_mate": 3,
+    "fact_line_en": "Forced mate in 3.", "fact_line_zh": "3 步强制将杀。"
+  },
+  {
+    "name": "white-much-better",
+    "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "uci": "e2e4", "eval_cp": 325, "eval_mate": null,
+    "fact_line_en": "White is much better (+3.2).", "fact_line_zh": "白方大幅领先(+3.2)。"
+  },
+  {
+    "name": "roughly-level",
+    "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "uci": "e2e4", "eval_cp": 20, "eval_mate": null,
+    "fact_line_en": "The position is roughly level.", "fact_line_zh": "局面大致均势。"
+  }
+]

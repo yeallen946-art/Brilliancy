@@ -131,18 +131,22 @@ def system_prompt(lang: str = "en") -> str:
 
 # ----------------------------------------------------------------- structured output
 
-class AltAnnotation(BaseModel):
-    uci: str = Field(description="UCI of the alternative move, copied from the data.")
-    prose: str = Field(description="Why this move is worse / interesting (<60 words).")
-
-
 class MoveAnnotationResult(BaseModel):
-    annotation: str = Field(description="Why the master move works (<60 words).")
-    alt_annotations: list[AltAnnotation] = Field(default_factory=list)
+    rationale: str = Field(description=(
+        "1-2 short sentences on WHY the master move works — the plan/idea only, in plain "
+        "language. State NO facts: no mate counts, no captures or material, no eval numbers, "
+        "no bare squares. Those are given separately and must NOT be repeated."))
 
 
 class GameIntroResult(BaseModel):
     narrative_intro: str = Field(description="2-3 sentence context, no result spoilers.")
+
+
+class JudgeResult(BaseModel):
+    verdict: str = Field(description="exactly 'pass' or 'revise'")
+    issues: list[str] = Field(
+        default_factory=list,
+        description="concrete grounding/consistency problems; empty when verdict is 'pass'")
 
 
 def strict_json_schema(model_cls: type[BaseModel]) -> dict:
@@ -281,6 +285,14 @@ def upcoming_guess_sans(game: GameRecord, move: MoveRecord) -> list[str]:
     ]
 
 
+def _fact_sheet_for(move: MoveRecord) -> facts.FactSheet:
+    """Deterministic FactSheet for the master move (ANNOTATION_PIPELINE_V2 §3.1)."""
+    entry = move.legal_evals.get(move.uci) or {}
+    cp = entry["cp"] if "cp" in entry else move.eval_cp
+    mate = entry["mate"] if "mate" in entry else move.eval_mate
+    return facts.build_fact_sheet(move.fen_before, move.uci, eval_cp=cp, eval_mate=mate)
+
+
 def build_move_prompt(game: GameRecord, move: MoveRecord, lang: str = "en") -> str:
     """User-message text: position + engine data + computed facts (TECH_SPEC §5.1).
 
@@ -328,27 +340,17 @@ def build_move_prompt(game: GameRecord, move: MoveRecord, lang: str = "en") -> s
             lines.append(f"           MATE FACTS: checking piece(s): {', '.join(pattern.checkers)}; "
                          f"escape squares covered by: {', '.join(pattern.supporters) or 'none needed'}")
 
-    # MATE DISTANCE: the engine's forced-mate count is a fact the prose must not miscount
-    # (Jerry 2026-06-17: Réti move-10 #2 was narrated as "mate next move"=#1, off-by-one
-    # against move-9's "mate in three"). Surface the exact distance so the wording is honest.
-    master_mate = (move.legal_evals.get(move.uci) or {}).get("mate")
-    if isinstance(master_mate, int) and master_mate > 0:
-        if facts.mate_pattern(move.fen_before, move.uci).is_mate:
-            mate_line = (f"MATE: {master_san} DELIVERS CHECKMATE — the game ends on this move. "
-                         f"Call it checkmate / mate (中文 \"将杀\"); NEVER \"mate in 1\" or any "
-                         f"distance — there is no move after it.")
-        else:
-            mate_line = (f"MATE DISTANCE: the engine reads {master_san} as a FORCED MATE IN "
-                         f"{master_mate} (it does NOT itself checkmate). If you state the distance, "
-                         f"it must be exactly \"mate in {master_mate}\" (中文 \"{master_mate}步内将杀\"); "
-                         f"\"next move\" / \"下一步\" means mate in one ONLY.")
+    # The deterministic fact line (checkmate / forced mate in N / eval verdict) is composed
+    # by facts.build_fact_sheet and prepended to the rationale downstream. Show it here so
+    # the model writes ONLY the "why" and never restates a fact it could get wrong (the whole
+    # point of v2: facts are not LLM-generated). See ANNOTATION_PIPELINE_V2 §3.1-3.2.
+    _fact_line = (_fact_sheet_for(move).fact_line_zh if lang == "zh"
+                  else _fact_sheet_for(move).fact_line_en)
+    if _fact_line:
         lines += [
             "",
-            mate_line,
-            f"Because {master_san} forces mate, every alternative above that is NOT itself a "
-            "forced mate THROWS THE MATE AWAY: its alt-note must say it gives up / lets the "
-            "forced mate slip (中文 \"放走了强制将杀\"), never frame it as merely a slower win "
-            "or as 'still winning' / '保持胜势' without that caveat.",
+            "FACTS ALREADY STATED — these are prepended to your rationale; do NOT repeat or "
+            f"re-derive them (no mate counts, no eval numbers): \"{_fact_line}\"",
         ]
 
     # BRANCH FACTS: when THIS move delivers mate and the hero's PREVIOUS move was a
@@ -397,29 +399,24 @@ def build_move_prompt(game: GameRecord, move: MoveRecord, lang: str = "en") -> s
             "without showing how.",
         ]
 
-    alt_sans = ", ".join(r["san"] for r in rows if not r["is_master"])
     if lang == "zh":
         motif_table = ", ".join(f"{en}={zh}" for en, zh in facts.MOTIF_ZH.items())
         piece_table = ", ".join(f"{en}={zh}" for en, zh in facts.PIECE_NAMES_ZH.items())
         lines += [
             "",
-            f"用中文写 `annotation`:为什么 {master_san} 成立 — 若引擎更偏好别的着法,"
-            f"则说明 {master_san} 的意图并诚实给出引擎观点。",
-            f"用中文为这些着法写 `alt_annotations`(仅限这些):{alt_sans or '(无)'}。"
-            "每条都以上方该着法自己的引擎应着变化为依据;说明猜棋的人为何会想走它、为何不如实着。"
-            "对手应着用文字描述不用记谱;只有该变化中列了吃子才能声称子力得失。",
+            f"用中文写 `rationale`:为什么 {master_san} 成立 —— 只写计划/思路,1-2 句。"
+            "不要重复上面已陈述的事实(不写第几步将杀、不写得失子、不写分数、不写裸格子)。"
+            f"若引擎更偏好别的着法,就诚实说明 {master_san} 的意图。",
             f"术语对照(只用这些):棋子 {piece_table};战术 {motif_table}。"
-            "着法记谱保留英文代数记谱法。",
+            "着法记谱保留英文代数记谱法(如 Bg5+)。",
         ]
     else:
         lines += [
             "",
-            f"Write `annotation`: why {master_san} works — or, if the engine prefers another "
-            f"move, what {master_san} is going for, with the engine's honest view.",
-            f"Write `alt_annotations` for these moves only: {alt_sans or '(none)'}. For each, "
-            "base the note on THAT move's engine reply line above; say why a guesser might try "
-            "it and why it is worse. Describe the opponent's replies in words, not notation, and "
-            "claim material loss only if that reply line shows a capture.",
+            f"Write `rationale`: why {master_san} works — the plan/idea only, 1-2 short "
+            "sentences. Do NOT repeat the facts already stated above (no mate counts, no "
+            "material, no eval numbers, no bare squares). If the engine prefers another move, "
+            f"say honestly what {master_san} is going for.",
         ]
     return "\n".join(lines)
 
@@ -443,11 +440,86 @@ def build_intro_prompt(game: GameRecord, lang: str = "en") -> str:
 
 # --------------------------------------------------------------------- apply results
 
+def compose_annotation(move: MoveRecord, rationale: str, lang: str = "en") -> str:
+    """Final annotation = deterministic fact_line + the LLM rationale (v2 §3.2). The
+    fact_line carries the verifiable claims; the rationale carries only the 'why'."""
+    fs = _fact_sheet_for(move)
+    line = fs.fact_line_zh if lang == "zh" else fs.fact_line_en
+    rationale = (rationale or "").strip()
+    return f"{line} {rationale}".strip() if line else rationale
+
+
+def _validate_one(game_id: str, move: MoveRecord, text: str, lang: str,
+                  upcoming_sans: list[str]) -> list[str]:
+    import validate
+    where = "annotation_zh" if lang == "zh" else "annotation"
+    return [e.message for e in
+            validate.validate_annotation_text(game_id, move, text, where, upcoming_sans)]
+
+
+def build_judge_prompt(move: MoveRecord, composed: str, lang: str = "en") -> str:
+    """Check the explanation for CONSISTENCY with authoritative engine facts (v2 §3.3).
+
+    Hard lesson (Jerry 2026-06-19 live run): asking the judge to re-derive legality/geometry
+    from a FEN makes it hallucinate (it called the real played move 'illegal') and flag
+    everything. So we feed it the ground-truth facts and forbid re-derivation — the judge
+    only checks the prose against those facts, the same fact-vs-interpretation split as the
+    rest of v2. It cannot catch motif-detector looseness (a separate, deferred concern)."""
+    fs = _fact_sheet_for(move)
+    san = _san(move.fen_before, move.uci)
+    motifs = facts.tactical_motifs(move.fen_before, move.uci)
+    motif_str = ", ".join(motifs) if motifs else "none"
+    verdict = ("checkmate" if fs.is_checkmate
+               else f"forced mate in {fs.mate_in}" if fs.mate_in
+               else f"engine eval {fs.eval_cp}cp for the side to move")
+    return (
+        "Check whether one chess explanation is CONSISTENT with the authoritative facts "
+        "below. These facts are GROUND TRUTH from an engine. Do NOT question them, do NOT "
+        "re-derive legality, checks, diagonals, or mate — the move was actually played and "
+        "is legal. Only compare the prose against the facts.\n"
+        f"Move: {san}. Engine verdict: {verdict}. Tactics actually present (the ONLY tactic "
+        f"names that may legitimately appear): {motif_str}.\n"
+        f"Explanation ({lang}):\n\"\"\"{composed}\"\"\"\n\n"
+        "Flag a problem ONLY if the explanation:\n"
+        "- names a tactic/motif NOT in the 'tactics actually present' list, or\n"
+        "- contradicts the engine verdict (calls a winning move weak, denies the mate, etc.), or\n"
+        "- is generic filler that doesn't explain THIS move's idea.\n"
+        "Be conservative: when unsure, verdict='pass'. Otherwise verdict='revise' and quote the "
+        "exact phrase at fault."
+    )
+
+
+def generate_rationale_with_repair(game_id: str, move: MoveRecord, lang: str,
+                                   upcoming_sans: list[str], *, generate, judge=None,
+                                   max_repairs: int = 3) -> tuple[str, list[str]]:
+    """Per-field generate -> compose -> validate -> judge -> repair loop (v2 §3.4).
+
+    `generate(error_messages)` returns a rationale; on a repair pass it receives the prior
+    issues so it can fix exactly those (no blind whole-game re-roll). `judge(composed)`
+    (optional) returns a list of grounding/consistency issues and runs only AFTER the cheap
+    deterministic checks pass. Returns (composed_annotation, residual_issues): residual empty
+    means clean; non-empty means the caller should flag the move NEEDS_HUMAN."""
+    errors: list[str] = []
+    composed = ""
+    for _ in range(max_repairs + 1):
+        rationale = generate(errors)
+        composed = compose_annotation(move, rationale, lang)
+        errors = _validate_one(game_id, move, composed, lang, upcoming_sans)
+        if not errors and judge is not None:
+            errors = judge(composed)            # only spend a judge call on validator-clean text
+        if not errors:
+            return composed, []
+    return composed, errors
+
+
 def apply_move_annotation(move: MoveRecord, result: MoveAnnotationResult,
                           lang: str = "en") -> None:
+    composed = compose_annotation(move, result.rationale, lang)
+    # Alt-move notes are templated by the app (GuessExplainer) from the engine reply line,
+    # not generated here (v2 decision E) — leave them empty.
     if lang == "zh":
-        move.annotation_zh = result.annotation
-        move.alt_annotations_zh = {a.uci: a.prose for a in result.alt_annotations}
+        move.annotation_zh = composed
+        move.alt_annotations_zh = {}
     else:
-        move.annotation = result.annotation
-        move.alt_annotations = {a.uci: a.prose for a in result.alt_annotations}
+        move.annotation = composed
+        move.alt_annotations = {}
