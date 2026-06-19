@@ -420,6 +420,14 @@ def _validate_main_prose(game_id: str, move: MoveRecord, text: str, where: str,
     return errors
 
 
+def validate_annotation_text(game_id: str, move: MoveRecord, text: str, where: str,
+                             upcoming_sans: list[str] | None = None) -> list[ValidationError]:
+    """Run the main-prose checks on ONE annotation text — the hook the v2 repair loop uses
+    to validate a freshly composed annotation before accepting it (ANNOTATION_PIPELINE_V2
+    §3.4)."""
+    return _validate_main_prose(game_id, move, text, where, upcoming_sans or [])
+
+
 def validate_move(game_id: str, move: MoveRecord,
                   upcoming_sans: list[str] | None = None) -> list[ValidationError]:
     errors: list[ValidationError] = []

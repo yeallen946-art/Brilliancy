@@ -206,26 +206,30 @@ def test_validate_accepts_checkmate_wording_on_mating_move():
     assert "mate_distance_mismatch" not in codes
 
 
-def test_move_prompt_says_checkmate_not_distance_on_mating_move():
+def test_move_prompt_shows_checkmate_fact_for_mating_move():
+    # v2: the deterministic fact line is shown as "already stated"; a mating move reads
+    # "Checkmate.", never a distance — the model writes only the rationale.
     from annotate import build_move_prompt
     move = _mating_move("x")
     game = _approved_game()
     game.moves = [move]
     prompt = build_move_prompt(game, move)
-    assert "DELIVERS CHECKMATE" in prompt
-    assert "FORCED MATE IN" not in prompt   # no distance framing for the mating move
+    assert "FACTS ALREADY STATED" in prompt
+    assert "Checkmate." in prompt
+    assert "Forced mate in" not in prompt
 
 
-def test_move_prompt_states_exact_mate_distance():
+def test_move_prompt_shows_forced_mate_fact_for_non_mating_move():
     from annotate import build_move_prompt
-    move = _mate_move("x", 2)
+    move = _mate_move("x", 2)   # forced mate in 2, not itself checkmate
     game = _approved_game()
     game.moves = [move]
     prompt = build_move_prompt(game, move)
-    assert "FORCED MATE IN 2" in prompt
-    # Alternatives that aren't themselves mates must be framed as throwing the mate away
-    # (Jerry 2026-06-17: Opera m16 Qb7 read as "keeps a winning position").
-    assert "THROWS THE MATE AWAY" in prompt
+    assert "FACTS ALREADY STATED" in prompt
+    assert "Forced mate in 2." in prompt
+    # v2: the prompt asks for rationale only, not free-prose annotation or alt notes.
+    assert "Write `rationale`" in prompt
+    assert "alt_annotations" not in prompt
 
 
 # Opera move-16 (Qb8+): "the quieter queen moves keep a big advantage" while 12 of 15
@@ -264,6 +268,87 @@ def test_validate_accepts_class_claim_when_true():
     )
     codes = {e.code for e in validate_move("g", move)}
     assert "overgeneralized_class_claim" not in codes
+
+
+# ------------------------------------------------------------------- FactSheet (v2 §3.1)
+
+def test_fact_sheet_checkmate_move():
+    import facts
+    fs = facts.build_fact_sheet(
+        "1n2kb1r/p4ppp/4q3/4p1B1/4P3/8/PPP2PPP/2KR4 w k - 0 17", "d1d8",  # Opera Rd8#
+        eval_cp=None, eval_mate=1)
+    assert fs.is_checkmate and fs.mate_in is None
+    assert fs.fact_line_en == "Checkmate." and fs.fact_line_zh == "将杀。"
+
+
+def test_fact_sheet_forced_mate_move():
+    import facts
+    fs = facts.build_fact_sheet(
+        "4kb1r/p2n1ppp/4q3/4p1B1/4P3/1Q6/PPP2PPP/2KR4 w k - 0 16", "b3b8",  # Opera Qb8+ (#2)
+        eval_cp=None, eval_mate=2)
+    assert not fs.is_checkmate and fs.mate_in == 2
+    assert fs.fact_line_en == "Forced mate in 2." and fs.fact_line_zh == "2 步强制将杀。"
+
+
+def test_fact_sheet_eval_verdict_for_positional_move():
+    import facts
+    # White to move, +3.25 -> "winning"-band? +3.25 = 325cp -> "much better" (>=300).
+    fs = facts.build_fact_sheet(START_FEN, "e2e4", eval_cp=325, eval_mate=None)
+    assert not fs.is_checkmate and fs.mate_in is None
+    assert "White is much better (+3.2)." == fs.fact_line_en
+    assert fs.fact_line_zh == "白方大幅领先(+3.2)。"
+
+
+def test_fact_sheet_eval_verdict_names_better_side_when_mover_worse():
+    import facts
+    # Black to move (after 1.e4), mover-POV -250 -> White is the better side.
+    fs = facts.build_fact_sheet(
+        "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1", "e7e5",
+        eval_cp=-250, eval_mate=None)
+    assert fs.fact_line_en == "White is clearly better (+2.5)."
+
+
+def test_fact_sheet_level_position():
+    import facts
+    fs = facts.build_fact_sheet(START_FEN, "e2e4", eval_cp=20, eval_mate=None)
+    assert fs.fact_line_en == "The position is roughly level."
+    assert fs.fact_line_zh == "局面大致均势。"
+
+
+# ------------------------------------------------------------------- v2 §3.5 monitoring
+
+def test_golden_fact_lines_stable():
+    # The deterministic fact layer must stay byte-stable (catches drift in verdict bands /
+    # mate wording when prompts or models change).
+    import json
+    import os
+    import facts
+    path = os.path.join(os.path.dirname(__file__), "..", "golden", "fact_lines.json")
+    with open(path, encoding="utf-8") as fh:
+        cases = json.load(fh)
+    assert len(cases) >= 4
+    for c in cases:
+        fs = facts.build_fact_sheet(c["fen"], c["uci"],
+                                    eval_cp=c["eval_cp"], eval_mate=c["eval_mate"])
+        assert fs.fact_line_en == c["fact_line_en"], c["name"]
+        assert fs.fact_line_zh == c["fact_line_zh"], c["name"]
+
+
+def test_sample_for_judging_deterministic_and_fractional():
+    from quality import sample_for_judging
+    ids = [f"game-{i}" for i in range(200)]
+    assert sample_for_judging(ids, 0.1) == sample_for_judging(ids, 0.1)   # reproducible
+    assert sample_for_judging(ids, 0) == []
+    assert sample_for_judging(ids, 1) == ids
+    assert 5 <= len(sample_for_judging(ids, 0.1)) <= 40                   # ~10%, loose bound
+
+
+def test_judge_report_aggregates_outliers():
+    from quality import judge_report
+    items = [("a", "ok text"), ("b", "bad text"), ("c", "fine")]
+    rep = judge_report(items, lambda t: ["hallucinated tactic"] if "bad" in t else [])
+    assert rep["total"] == 3 and rep["revised"] == 1
+    assert rep["issues"] == {"b": ["hallucinated tactic"]}
 
 
 def test_system_prompt_forbids_class_generalization():
@@ -410,11 +495,9 @@ def test_move_prompt_drops_alternatives_colliding_with_future_answers():
     from annotate import build_move_prompt
     game = _two_point_game("placeholder")
     # d2d4 is an engine candidate at the FIRST point, but d4 is the SECOND point's
-    # master move — the prompt must not ask for prose about it ("Rd1 leak" class).
+    # master move — it must be dropped from the candidate table the model sees so the
+    # rationale can't leak it ("Rd1 leak" class).
     first_prompt = build_move_prompt(game, game.moves[0])
-    alt_request = first_prompt.split("Write `alt_annotations`")[1]
-    assert "d4" not in alt_request.split("\n")[0]
-    # And it disappears from the candidate table too (only the master row remains).
     table = first_prompt.split("Engine evaluations")[1].split("SPOILER GUARD")[0]
     assert "d4" not in table
 
@@ -550,15 +633,96 @@ def test_zh_prompt_carries_terminology_and_language_directive():
     assert "chess coach" in system_prompt("en")
 
 
-def test_apply_move_annotation_routes_by_lang():
-    from annotate import AltAnnotation, MoveAnnotationResult, apply_move_annotation
+def test_repair_loop_fixes_then_passes():
+    # v2 §3.4: a too-long rationale is repaired with the validator errors fed back, not
+    # by a blind re-roll. The fake generator returns bad text first, then a clean one.
+    from annotate import generate_rationale_with_repair
     move = _gp_move(20, evals={"e2e4": {"cp": 30}})
-    result = MoveAnnotationResult(
-        annotation="中心兵推进,白方主动。",
-        alt_annotations=[AltAnnotation(uci="d2d4", prose="同样占中,但稍缓。")])
+    long_bad = " ".join(["centralizes"] * 40)   # one 40-word sentence -> hard_to_read
+    calls: list[list[str]] = []
+
+    def gen(errors):
+        calls.append(errors)
+        return long_bad if len(calls) == 1 else "It takes the center and frees the pieces."
+
+    composed, residual = generate_rationale_with_repair(
+        "g", move, "en", [], generate=gen, max_repairs=3)
+    assert residual == []
+    assert composed.startswith("The position is roughly level.")   # deterministic fact_line
+    assert "takes the center" in composed
+    assert len(calls) == 2 and calls[1]   # repaired once; the retry saw the error messages
+
+
+def test_repair_loop_flags_when_unfixable():
+    from annotate import generate_rationale_with_repair
+    move = _gp_move(20, evals={"e2e4": {"cp": 30}})
+    long_bad = " ".join(["centralizes"] * 40)
+    composed, residual = generate_rationale_with_repair(
+        "g", move, "en", [], generate=lambda errors: long_bad, max_repairs=2)
+    assert residual                       # exhausted the cap -> still failing
+    assert any("hard_to_read" in r or "longest sentence" in r for r in residual)
+
+
+def test_repair_loop_runs_judge_after_validator_and_repairs():
+    # v2 §3.3: judge runs only on validator-clean text; its issues feed the same repair
+    # channel. Judge rejects once (hallucinated tactic), then passes.
+    from annotate import generate_rationale_with_repair
+    move = _gp_move(20, evals={"e2e4": {"cp": 30}})
+    gen_calls: list[list[str]] = []
+
+    def gen(errors):
+        gen_calls.append(errors)
+        return "It frees the pieces." if len(gen_calls) > 1 else "It grabs the center fast."
+
+    judge_calls: list[str] = []
+
+    def judge(composed):
+        judge_calls.append(composed)
+        return ["claims a fork that is not on the board"] if len(judge_calls) == 1 else []
+
+    composed, residual = generate_rationale_with_repair(
+        "g", move, "en", [], generate=gen, judge=judge, max_repairs=3)
+    assert residual == []
+    assert len(gen_calls) == 2                                  # regenerated after judge rejected
+    assert gen_calls[1] == ["claims a fork that is not on the board"]   # issue fed back
+    assert len(judge_calls) == 2
+
+
+def test_repair_loop_skips_judge_when_validator_fails():
+    from annotate import generate_rationale_with_repair
+    move = _gp_move(20, evals={"e2e4": {"cp": 30}})
+    long_bad = " ".join(["x"] * 40)   # validator hard_to_read -> judge must not run
+    judge_calls: list[str] = []
+
+    composed, residual = generate_rationale_with_repair(
+        "g", move, "en", [], generate=lambda e: long_bad,
+        judge=lambda c: judge_calls.append(c) or [], max_repairs=1)
+    assert residual                   # deterministic validator failed
+    assert judge_calls == []          # judge gated behind a clean validator pass
+
+
+def test_build_judge_prompt_is_fact_grounded_not_board_rederivation():
+    # The judge must check prose against authoritative facts, NOT re-derive the board (which
+    # made it hallucinate "illegal move" and flag everything). So: facts + text present,
+    # FEN absent, and an explicit "do not re-derive legality" instruction.
+    from annotate import build_judge_prompt
+    move = _mating_move("x")          # Opera Rd8#
+    text = "Checkmate. The rook seals the back rank."
+    p = build_judge_prompt(move, text, "en")
+    assert "Rd8#" in p and text in p and "GROUND TRUTH" in p
+    assert move.fen_before not in p                      # no FEN -> no geometry re-derivation
+    assert "re-derive legality" in p
+
+
+def test_apply_move_annotation_composes_fact_line_and_rationale():
+    # v2: final annotation = deterministic fact_line + LLM rationale; alts left empty
+    # (templated by the app). cp=30 -> "roughly level" verdict.
+    from annotate import MoveAnnotationResult, apply_move_annotation
+    move = _gp_move(20, evals={"e2e4": {"cp": 30}})
+    result = MoveAnnotationResult(rationale="中心兵推进,白方主动。")
     apply_move_annotation(move, result, lang="zh")
-    assert move.annotation_zh == "中心兵推进,白方主动。"
-    assert move.alt_annotations_zh == {"d2d4": "同样占中,但稍缓。"}
+    assert move.annotation_zh == "局面大致均势。 中心兵推进,白方主动。"
+    assert move.alt_annotations_zh == {}                   # alts templated by app, not here
     assert move.annotation == "x"                          # en untouched
 
 
