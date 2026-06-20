@@ -113,6 +113,14 @@ PIECE_WORD_TO_TYPE = {
 }
 MIN_CLASS_MOVES = 3   # need enough of that piece's moves for a class claim to be meaningful
 
+# A2 (open question A): tactic-label nouns are forbidden in the rationale — the geometric
+# motif detector mislabels them (Qb8+ -> "skewer"), so the prose must describe the idea in
+# plain words instead. Deterministic enforcement so a slip is repaired, never shipped.
+TACTIC_LABEL_RE = re.compile(
+    r"\b(forks?|forking|forked|pins?|pinning|pinned|skewers?|skewering|skewered|"
+    r"discovered\s+(?:check|attack))\b", re.I)
+TACTIC_LABEL_RE_ZH = re.compile(r"(双吃|牵制|串击|闪将)")
+
 
 @dataclass
 class ValidationError:
@@ -314,6 +322,19 @@ def check_class_generalization(text: str, move: MoveRecord,
     return errors
 
 
+def check_no_tactic_labels(text: str, game_id: str, ply: int, where: str) -> list[ValidationError]:
+    """Forbid tactic-label nouns (fork/pin/skewer/discovered check, 双吃/牵制/串击/闪将);
+    the rationale must describe the idea in plain words (A2)."""
+    if not text:
+        return []
+    hits = [m.group(0) for m in TACTIC_LABEL_RE.finditer(text)]
+    hits += [m.group(0) for m in TACTIC_LABEL_RE_ZH.finditer(text)]
+    return [ValidationError(
+        game_id, ply, "tactic_label",
+        f"{where}: uses tactic label '{h.strip()}' — describe the idea in plain words "
+        "(the motif detector is unreliable, A2)") for h in hits]
+
+
 def _normalize_san(san: str) -> str:
     return san.rstrip("+#")
 
@@ -403,6 +424,9 @@ def _validate_main_prose(game_id: str, move: MoveRecord, text: str, where: str,
     # 4e) blanket "the <quieter> <piece> moves keep the advantage" claims must hold across
     # that piece's moves in legal_evals (Opera m16 overgeneralization, §5.1).
     errors.extend(check_class_generalization(text, move, game_id, move.ply, where))
+
+    # 4f) no tactic-label nouns — describe the idea in plain words (A2).
+    errors.extend(check_no_tactic_labels(text, game_id, move.ply, where))
 
     # 4b) spoiler guard: must not name a master move the trainee still has to guess.
     errors.extend(check_future_guess_spoilers(

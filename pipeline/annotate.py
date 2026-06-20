@@ -332,9 +332,9 @@ def build_move_prompt(game: GameRecord, move: MoveRecord, lang: str = "en") -> s
         if mat.captures:
             lines.append(f"           captures in line: {', '.join(mat.captures)} "
                          f"(net {mat.net_pawns:+d} pawn-units for the mover)")
-        motifs = facts.tactical_motifs(move.fen_before, r["uci"])
-        if motifs:
-            lines.append(f"           tactics: {', '.join(m.replace('_', ' ') for m in motifs)}")
+        # A2 (open question A): the geometric motif detector mislabels tactics (Qb8+ ->
+        # "skewer"), so we do NOT feed tactic names to the model — it describes the plan in
+        # words instead, and a validator check forbids tactic-label nouns.
         pattern = facts.mate_pattern(move.fen_before, r["uci"])
         if pattern.is_mate:
             lines.append(f"           MATE FACTS: checking piece(s): {', '.join(pattern.checkers)}; "
@@ -400,23 +400,25 @@ def build_move_prompt(game: GameRecord, move: MoveRecord, lang: str = "en") -> s
         ]
 
     if lang == "zh":
-        motif_table = ", ".join(f"{en}={zh}" for en, zh in facts.MOTIF_ZH.items())
         piece_table = ", ".join(f"{en}={zh}" for en, zh in facts.PIECE_NAMES_ZH.items())
         lines += [
             "",
             f"用中文写 `rationale`:为什么 {master_san} 成立 —— 只写计划/思路,1-2 句。"
             "不要重复上面已陈述的事实(不写第几步将杀、不写得失子、不写分数、不写裸格子)。"
+            "用计划语言描述战术思路(如「把马引开,底线随即崩溃」),不要贴战术标签名"
+            "(双吃、牵制、串击、闪将等)。"
             f"若引擎更偏好别的着法,就诚实说明 {master_san} 的意图。",
-            f"术语对照(只用这些):棋子 {piece_table};战术 {motif_table}。"
-            "着法记谱保留英文代数记谱法(如 Bg5+)。",
+            f"术语对照(只用这些):棋子 {piece_table}。着法记谱保留英文代数记谱法(如 Bg5+)。",
         ]
     else:
         lines += [
             "",
             f"Write `rationale`: why {master_san} works — the plan/idea only, 1-2 short "
             "sentences. Do NOT repeat the facts already stated above (no mate counts, no "
-            "material, no eval numbers, no bare squares). If the engine prefers another move, "
-            f"say honestly what {master_san} is going for.",
+            "material, no eval numbers, no bare squares). Describe tactical ideas in plain "
+            "words (e.g. 'draws the knight away so the back rank collapses') — do NOT use "
+            "tactic-label nouns (fork, pin, skewer, discovered check). If the engine prefers "
+            f"another move, say honestly what {master_san} is going for.",
         ]
     return "\n".join(lines)
 
@@ -467,8 +469,6 @@ def build_judge_prompt(move: MoveRecord, composed: str, lang: str = "en") -> str
     rest of v2. It cannot catch motif-detector looseness (a separate, deferred concern)."""
     fs = _fact_sheet_for(move)
     san = _san(move.fen_before, move.uci)
-    motifs = facts.tactical_motifs(move.fen_before, move.uci)
-    motif_str = ", ".join(motifs) if motifs else "none"
     verdict = ("checkmate" if fs.is_checkmate
                else f"forced mate in {fs.mate_in}" if fs.mate_in
                else f"engine eval {fs.eval_cp}cp for the side to move")
@@ -477,12 +477,11 @@ def build_judge_prompt(move: MoveRecord, composed: str, lang: str = "en") -> str
         "below. These facts are GROUND TRUTH from an engine. Do NOT question them, do NOT "
         "re-derive legality, checks, diagonals, or mate — the move was actually played and "
         "is legal. Only compare the prose against the facts.\n"
-        f"Move: {san}. Engine verdict: {verdict}. Tactics actually present (the ONLY tactic "
-        f"names that may legitimately appear): {motif_str}.\n"
+        f"Move: {san}. Engine verdict: {verdict}.\n"
         f"Explanation ({lang}):\n\"\"\"{composed}\"\"\"\n\n"
         "Flag a problem ONLY if the explanation:\n"
-        "- names a tactic/motif NOT in the 'tactics actually present' list, or\n"
         "- contradicts the engine verdict (calls a winning move weak, denies the mate, etc.), or\n"
+        "- describes a concrete plan or threat that makes no sense for this move, or\n"
         "- is generic filler that doesn't explain THIS move's idea.\n"
         "Be conservative: when unsure, verdict='pass'. Otherwise verdict='revise' and quote the "
         "exact phrase at fault."
