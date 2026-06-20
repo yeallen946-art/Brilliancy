@@ -351,6 +351,27 @@ def test_judge_report_aggregates_outliers():
     assert rep["issues"] == {"b": ["hallucinated tactic"]}
 
 
+def test_validate_flags_tactic_label_nouns():
+    # A2: the rationale must describe the idea in plain words, not name tactics.
+    from validate import validate_move
+    for bad, lang_field in [("It sets up a skewer along the rank.", "annotation"),
+                            ("借助串击撕开底线。", "annotation_zh")]:
+        move = MoveRecord(ply=20, san="e4", uci="e2e4", fen_before=START_FEN, mover="white",
+                          is_guess_point=True, legal_evals={"e2e4": {"cp": 30}},
+                          **{lang_field: bad})
+        codes = {e.code for e in validate_move("g", move)}
+        assert "tactic_label" in codes, bad
+
+
+def test_validate_accepts_plain_language_tactics():
+    from validate import validate_move
+    move = MoveRecord(ply=20, san="e4", uci="e2e4", fen_before=START_FEN, mover="white",
+                      is_guess_point=True, legal_evals={"e2e4": {"cp": 30}},
+                      annotation="It draws the knight away so the back rank collapses.")
+    codes = {e.code for e in validate_move("g", move)}
+    assert "tactic_label" not in codes
+
+
 def test_system_prompt_forbids_class_generalization():
     from annotate import system_prompt
     assert "generalize about a CATEGORY" in system_prompt("en")
@@ -626,7 +647,9 @@ def test_zh_prompt_carries_terminology_and_language_directive():
     game = _two_point_game("placeholder")
     prompt = build_move_prompt(game, game.moves[0], lang="zh")
     assert "用中文写" in prompt
-    assert "牵制" in prompt and "双吃" in prompt          # motif table from facts.py
+    assert "棋子 pawn=兵" in prompt                         # piece terminology table (zh)
+    assert "不要贴战术标签" in prompt                       # A2: forbid tactic labels
+    assert "tactics:" not in prompt                        # A2: motif hints no longer fed
     assert "Position (FEN)" in prompt                      # same engine data, same facts
     assert "SPOILER GUARD" in prompt                       # spoiler rules apply to zh too
     assert "你是一名国际象棋教练" in system_prompt("zh")
